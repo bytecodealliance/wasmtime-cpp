@@ -26,8 +26,9 @@ using namespace wasmtime;
 
 template<typename T, typename E>
 T unwrap(Result<T, E> result) {
-  if (result)
+  if (result) {
     return result.ok();
+  }
   std::cerr << "error: " << result.err().message() << "\n";
   std::abort();
 }
@@ -59,7 +60,7 @@ int main() {
   wasi.inherit_stdin();
   wasi.inherit_stdout();
   wasi.inherit_stderr();
-  store.context().set_wasi(std::move(wasi));
+  unwrap(store.context().set_wasi(std::move(wasi)));
 
   // Create our linker which will be linking our modules together, and then add
   // our WASI instance to it.

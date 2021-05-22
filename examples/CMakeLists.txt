@@ -4,6 +4,5 @@ function(add_example name)
 endfunction()
 
 add_example(fuel)
-add_example(hello)
 add_example(interrupt)
 add_example(linking)

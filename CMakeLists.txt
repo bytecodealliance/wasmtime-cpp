@@ -9,10 +9,10 @@ message(STATUS "ENABLE_CODE_ANALYSIS       ${ENABLE_CODE_ANALYSIS}")
 
 if(ENABLE_CODE_ANALYSIS)
   if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    set(CMAKE_CXX_CLANG_TIDY
-      clang-tidy;
-      -header-filter=.;
-      -checks=*;)
+    set(CMAKE_CXX_CLANG_TIDY clang-tidy
+        -checks=-*,readability-*,bugprone-*,-bugprone-exception-escape,clang-analyzer-*,cppcoreguidelines-*,portability-*,performance-*
+        -header-filter=wasmtime.hh
+        -warnings-as-errors=*)
   endif()
 endif()
 

@@ -26,8 +26,9 @@ using namespace wasmtime;
 
 template<typename T, typename E>
 T unwrap(Result<T, E> result) {
-  if (result)
+  if (result) {
     return result.ok();
+  }
   std::cerr << "error: " << result.err().message() << "\n";
   std::abort();
 }
@@ -40,12 +41,14 @@ std::string readFile(const char* name) {
   return strStream.str();
 }
 
+const size_t kStoreFuel = 10000;
+
 int main() {
   Config config;
   config.consume_fuel(true);
   Engine engine(std::move(config));
   Store store(engine);
-  store.context().add_fuel(10000);
+  unwrap(store.context().add_fuel(kStoreFuel));
 
   auto wat = readFile("examples/fuel.wat");
   Module module = unwrap(Module::compile(engine, wat));

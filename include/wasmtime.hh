@@ -113,10 +113,12 @@ public:
     Lightbeam = WASMTIME_STRATEGY_LIGHTBEAM,
   };
 
+  [[nodiscard]]
   Result<std::monostate> strategy(Strategy strategy) {
-    auto error = wasmtime_config_strategy_set(ptr.get(), (wasmtime_strategy_t) strategy);
-    if (error)
+    auto *error = wasmtime_config_strategy_set(ptr.get(), (wasmtime_strategy_t) strategy);
+    if (error != nullptr) {
       return Error(error);
+    }
     return std::monostate();
   }
 
@@ -140,10 +142,12 @@ public:
     ProfileVtune = WASMTIME_PROFILING_STRATEGY_VTUNE,
   };
 
+  [[nodiscard]]
   Result<std::monostate> profiler(ProfilingStrategy profiler) {
-    auto error = wasmtime_config_profiler_set(ptr.get(), (wasmtime_profiling_strategy_t) profiler);
-    if (error)
+    auto *error = wasmtime_config_profiler_set(ptr.get(), (wasmtime_profiling_strategy_t) profiler);
+    if (error != nullptr) {
       return Error(error);
+    }
     return std::monostate();
   }
 
@@ -159,17 +163,21 @@ public:
     wasmtime_config_dynamic_memory_guard_size_set(ptr.get(), size);
   }
 
+  [[nodiscard]]
   Result<std::monostate> cache_load_default() {
-    auto error = wasmtime_config_cache_config_load(ptr.get(), nullptr);
-    if (error)
+    auto *error = wasmtime_config_cache_config_load(ptr.get(), nullptr);
+    if (error != nullptr) {
       return Error(error);
+    }
     return std::monostate();
   }
 
+  [[nodiscard]]
   Result<std::monostate> cache_load(std::string &path) {
-    auto error = wasmtime_config_cache_config_load(ptr.get(), path.c_str());
-    if (error)
+    auto *error = wasmtime_config_cache_config_load(ptr.get(), path.c_str());
+    if (error != nullptr) {
       return Error(error);
+    }
     return std::monostate();
   }
 };
@@ -192,13 +200,17 @@ public:
   Engine(Config config) : ptr(wasm_engine_new_with_config(config.ptr.release())) {}
 };
 
+[[nodiscard]]
 Result<std::vector<uint8_t>> wat2wasm(std::string_view wat) {
   wasm_byte_vec_t ret;
-  auto error = wasmtime_wat2wasm(wat.data(), wat.size(), &ret);
-  if (error)
+  auto *error = wasmtime_wat2wasm(wat.data(), wat.size(), &ret);
+  if (error != nullptr) {
     return Error(error);
+  }
   std::vector<uint8_t> vec;
-  vec.assign(ret.data, ret.data + ret.size);
+  // NOLINTNEXTLINE TODO can this be done without triggering lints?
+  std::span<uint8_t> raw(reinterpret_cast<uint8_t*>(ret.data), ret.size);
+  vec.assign(raw.begin(), raw.end());
   wasm_byte_vec_delete(&ret);
   return vec;
 }
@@ -210,25 +222,18 @@ class Limits {
   wasm_limits_t raw;
 
 public:
-  Limits(uint32_t min) {
-    raw.min = min;
-    raw.max = wasm_limits_max_default;
-  }
-  Limits(uint32_t min, uint32_t max) {
-    raw.min = min;
-    raw.max = max;
-  }
-  Limits(const wasm_limits_t *limits) {
-    raw = *limits;
-  }
+  Limits(uint32_t min) : raw({.min = min, .max = wasm_limits_max_default}) {}
+  Limits(uint32_t min, uint32_t max) : raw({.min = min, .max = max}) {}
+  Limits(const wasm_limits_t *limits) : raw(*limits) {}
 
   uint32_t min() const {
     return raw.min;
   }
 
   std::optional<uint32_t> max() const {
-    if (raw.max == wasm_limits_max_default)
+    if (raw.max == wasm_limits_max_default) {
       return std::nullopt;
+    }
     return raw.max;
   }
 };
@@ -299,14 +304,27 @@ public:
     ListRef(const wasm_valtype_vec_t *list) : list(list) {}
 
     typedef const Ref* iterator;
-    iterator begin() const { return reinterpret_cast<Ref*>(&list->data[0]); }
-    iterator end() const { return reinterpret_cast<Ref*>(&list->data[list->size]); }
+    iterator begin() const { return reinterpret_cast<Ref*>(&list->data[0]); } // NOLINT
+    iterator end() const { return reinterpret_cast<Ref*>(&list->data[list->size]); } // NOLINT
     size_t size() const { return list->size; }
   };
 
-  ValType(ValKind kind) : ptr(wasm_valtype_new(kind_to_c(kind))) {}
-  ValType(const ValType &other) : ptr(wasm_valtype_copy(other.ptr.get())) {}
-  ValType(Ref other) : ptr(wasm_valtype_copy(other.ptr)) {}
+private:
+  Ref ref;
+  ValType(wasm_valtype_t *ptr) : ptr(ptr), ref(ptr) {}
+public:
+
+  ValType(ValKind kind) : ValType(wasm_valtype_new(kind_to_c(kind))) {}
+  ValType(Ref other) : ValType(wasm_valtype_copy(other.ptr)) {}
+  ValType(const ValType &other) : ValType(wasm_valtype_copy(other.ptr.get())) {}
+  ValType &operator=(const ValType &other) {
+    ptr.reset(wasm_valtype_copy(other.ptr.get()));
+    return *this;
+  }
+  ~ValType() = default;
+  ValType(ValType &&other) = default;
+  ValType &operator=(ValType &&other) = default;
+
 
   static ValType i32() { return ValType(KindI32); }
   static ValType i64() { return ValType(KindI64); }
@@ -315,12 +333,8 @@ public:
   static ValType externref() { return ValType(KindExternRef); }
   static ValType funcref() { return ValType(KindFuncRef); }
 
-  Ref* operator->() {
-    return reinterpret_cast<Ref*>(&ptr);
-  }
-  Ref* operator*() {
-    return reinterpret_cast<Ref*>(&ptr);
-  }
+  Ref* operator->() { return &ref; }
+  Ref* operator*() { return &ref; }
 };
 
 class MemoryType {
@@ -333,8 +347,6 @@ class MemoryType {
   };
 
   std::unique_ptr<wasm_memorytype_t, deleter> ptr;
-
-  MemoryType(wasm_memorytype_t *ptr) : ptr(ptr) {}
 
 public:
   class Ref {
@@ -351,16 +363,24 @@ public:
     }
   };
 
-  MemoryType(Limits limits) : MemoryType(wasm_memorytype_new(&limits.raw)) {}
-  MemoryType(const MemoryType &other) : MemoryType(wasm_memorytype_copy(other.ptr.get())) {}
-  MemoryType(Ref other) : MemoryType(wasm_memorytype_copy(other.ptr)) {}
+private:
+  Ref ref;
+  MemoryType(wasm_memorytype_t *ptr) : ptr(ptr), ref(ptr) {}
+public:
 
-  Ref* operator->() {
-    return reinterpret_cast<Ref*>(&ptr);
+  MemoryType(Limits limits) : MemoryType(wasm_memorytype_new(&limits.raw)) {}
+  MemoryType(Ref other) : MemoryType(wasm_memorytype_copy(other.ptr)) {}
+  MemoryType(const MemoryType &other) : MemoryType(wasm_memorytype_copy(other.ptr.get())) {}
+  MemoryType &operator=(const MemoryType &other) {
+    ptr.reset(wasm_memorytype_copy(other.ptr.get()));
+    return *this;
   }
-  Ref* operator*() {
-    return reinterpret_cast<Ref*>(&ptr);
-  }
+  ~MemoryType() = default;
+  MemoryType(MemoryType &&other) = default;
+  MemoryType &operator=(MemoryType &&other) = default;
+
+  Ref* operator->() { return &ref; }
+  Ref* operator*() { return &ref; }
 };
 
 class TableType {
@@ -374,7 +394,6 @@ class TableType {
 
   std::unique_ptr<wasm_tabletype_t, deleter> ptr;
 
-  TableType(wasm_tabletype_t *ptr) : ptr(ptr) {}
 public:
   class Ref {
     friend class TableType;
@@ -394,16 +413,24 @@ public:
     }
   };
 
-  TableType(ValType ty, Limits limits) : TableType(wasm_tabletype_new(ty.ptr.release(), &limits.raw)) {}
-  TableType(const TableType &other) : TableType(wasm_tabletype_copy(other.ptr.get())) {}
-  TableType(Ref other) : TableType(wasm_tabletype_copy(other.ptr)) {}
+private:
+  Ref ref;
+  TableType(wasm_tabletype_t *ptr) : ptr(ptr), ref(ptr) {}
+public:
 
-  Ref* operator->() {
-    return reinterpret_cast<Ref*>(&ptr);
+  TableType(ValType ty, Limits limits) : TableType(wasm_tabletype_new(ty.ptr.release(), &limits.raw)) {}
+  TableType(Ref other) : TableType(wasm_tabletype_copy(other.ptr)) {}
+  TableType(const TableType &other) : TableType(wasm_tabletype_copy(other.ptr.get())) {}
+  TableType &operator=(const TableType &other) {
+    ptr.reset(wasm_tabletype_copy(other.ptr.get()));
+    return *this;
   }
-  Ref* operator*() {
-    return reinterpret_cast<Ref*>(&ptr);
-  }
+  ~TableType() = default;
+  TableType(TableType &&other) = default;
+  TableType &operator=(TableType &&other) = default;
+
+  Ref* operator->() { return &ref; }
+  Ref* operator*() { return &ref; }
 };
 
 class GlobalType {
@@ -416,7 +443,6 @@ class GlobalType {
   };
 
   std::unique_ptr<wasm_globaltype_t, deleter> ptr;
-  GlobalType(wasm_globaltype_t *ptr) : ptr(ptr) {}
 public:
   class Ref {
     friend class GlobalType;
@@ -435,18 +461,25 @@ public:
     }
   };
 
+private:
+  Ref ref;
+  GlobalType(wasm_globaltype_t *ptr) : ptr(ptr), ref(ptr) {}
+public:
   GlobalType(ValType ty, bool mut)
     : GlobalType(wasm_globaltype_new(ty.ptr.release(), (wasm_mutability_t) (mut ? WASM_VAR : WASM_CONST)))
   {}
-  GlobalType(const GlobalType &other) : GlobalType(wasm_globaltype_copy(other.ptr.get())) {}
   GlobalType(Ref other) : GlobalType(wasm_globaltype_copy(other.ptr)) {}
+  GlobalType(const GlobalType &other) : GlobalType(wasm_globaltype_copy(other.ptr.get())) {}
+  GlobalType &operator=(const GlobalType &other) {
+    ptr.reset(wasm_globaltype_copy(other.ptr.get()));
+    return *this;
+  }
+  ~GlobalType() = default;
+  GlobalType(GlobalType &&other) = default;
+  GlobalType &operator=(GlobalType &&other) = default;
 
-  Ref* operator->() {
-    return reinterpret_cast<Ref*>(&ptr);
-  }
-  Ref* operator*() {
-    return reinterpret_cast<Ref*>(&ptr);
-  }
+  Ref* operator->() { return &ref; }
+  Ref* operator*() { return &ref; }
 };
 
 class FuncType {
@@ -460,7 +493,6 @@ class FuncType {
 
   std::unique_ptr<wasm_functype_t, deleter> ptr;
 
-  FuncType(wasm_functype_t *ptr) : ptr(ptr) {}
 public:
   class Ref {
     friend class FuncType;
@@ -478,34 +510,42 @@ public:
       return wasm_functype_results(ptr);
     }
   };
-
+private:
+  Ref ref;
+  FuncType(wasm_functype_t *ptr) : ptr(ptr), ref(ptr) {}
 public:
+
   FuncType(std::initializer_list<ValType> params, std::initializer_list<ValType> results)
+    : ref(nullptr)
   {
     wasm_valtype_vec_t param_vec;
     wasm_valtype_vec_t result_vec;
     wasm_valtype_vec_new_uninitialized(&param_vec, params.size());
     wasm_valtype_vec_new_uninitialized(&result_vec, results.size());
-    for (size_t i = 0; i < params.size(); i++) {
-      auto val = *(params.begin() + i);
-      param_vec.data[i] = val.ptr.release();
+    size_t i = 0;
+    for (auto val : params) {
+      param_vec.data[i++] = val.ptr.release(); // NOLINT
     }
-    for (size_t i = 0; i < results.size(); i++) {
-      auto val = *(results.begin() + i);
-      result_vec.data[i] = val.ptr.release();
+    i = 0;
+    for (auto val : results) {
+      result_vec.data[i++] = val.ptr.release(); // NOLINT
     }
 
     ptr.reset(wasm_functype_new(&param_vec, &result_vec));
+    ref = ptr.get();
   }
-  FuncType(const FuncType &other) : FuncType(wasm_functype_copy(other.ptr.get())) {}
   FuncType(Ref other) : FuncType(wasm_functype_copy(other.ptr)) {}
+  FuncType(const FuncType &other) : FuncType(wasm_functype_copy(other.ptr.get())) {}
+  FuncType &operator=(const FuncType &other) {
+    ptr.reset(wasm_functype_copy(other.ptr.get()));
+    return *this;
+  }
+  ~FuncType() = default;
+  FuncType(FuncType &&other) = default;
+  FuncType &operator=(FuncType &&other) = default;
 
-  Ref* operator->() {
-    return reinterpret_cast<Ref*>(&ptr);
-  }
-  Ref* operator*() {
-    return reinterpret_cast<Ref*>(&ptr);
-  }
+  Ref* operator->() { return &ref; }
+  Ref* operator*() { return &ref; }
 };
 
 class ImportType {
@@ -520,12 +560,12 @@ public:
     Ref(const wasm_importtype_t *ptr) : ptr(ptr) {}
 
     std::string_view module() {
-      auto name = wasm_importtype_module(ptr);
+      const auto *name = wasm_importtype_module(ptr);
       return std::string_view(name->data, name->size);
     }
 
     std::string_view name() {
-      auto name = wasm_importtype_name(ptr);
+      const auto *name = wasm_importtype_name(ptr);
       return std::string_view(name->data, name->size);
     }
 
@@ -542,27 +582,26 @@ public:
     wasm_importtype_vec_t list;
 
   public:
-    List() {
-      list.size = 0;
-    }
+    List() : list({.size = 0}) {}
     List(const List& other) = delete;
-    List(List&& other) {
-      list = other.list;
+    List(List&& other) noexcept : list(other.list) {
       other.list.size = 0;
     }
     ~List() {
-      if (list.size > 0)
+      if (list.size > 0) {
         wasm_importtype_vec_delete(&list);
+      }
     }
 
-    void operator=(const List& other) = delete;
-    void operator=(List&& other) {
+    List& operator=(const List& other) = delete;
+    List& operator=(List&& other) noexcept {
       std::swap(list, other.list);
+      return *this;
     }
 
     typedef const Ref* iterator;
-    iterator begin() const { return reinterpret_cast<iterator>(&list.data[0]); }
-    iterator end() const { return reinterpret_cast<iterator>(&list.data[list.size]); }
+    iterator begin() const { return reinterpret_cast<iterator>(&list.data[0]); } // NOLINT
+    iterator end() const { return reinterpret_cast<iterator>(&list.data[list.size]); } // NOLINT
     size_t size() const { return list.size; }
   };
 };
@@ -577,7 +616,7 @@ public:
     Ref(const wasm_exporttype_t *ptr) : ptr(ptr) {}
 
     std::string_view name() {
-      auto name = wasm_exporttype_name(ptr);
+      const auto *name = wasm_exporttype_name(ptr);
       return std::string_view(name->data, name->size);
     }
 
@@ -593,27 +632,26 @@ public:
     wasm_exporttype_vec_t list;
 
   public:
-    List() {
-      list.size = 0;
-    }
+    List() : list({.size = 0}) {}
     List(const List& other) = delete;
-    List(List&& other) {
-      list = other.list;
+    List(List&& other) noexcept : list(other.list) {
       other.list.size = 0;
     }
     ~List() {
-      if (list.size > 0)
+      if (list.size > 0) {
         wasm_exporttype_vec_delete(&list);
+      }
     }
 
-    void operator=(const List& other) = delete;
-    void operator=(List&& other) {
+    List &operator=(const List& other) = delete;
+    List &operator=(List&& other) noexcept {
       std::swap(list, other.list);
+      return *this;
     }
 
     typedef const Ref* iterator;
-    iterator begin() const { return reinterpret_cast<iterator>(&list.data[0]); }
-    iterator end() const { return reinterpret_cast<iterator>(&list.data[list.size]); }
+    iterator begin() const { return reinterpret_cast<iterator>(&list.data[0]); } // NOLINT
+    iterator end() const { return reinterpret_cast<iterator>(&list.data[list.size]); } // NOLINT
     size_t size() const { return list.size; }
   };
 };
@@ -628,8 +666,6 @@ class ModuleType {
   };
 
   std::unique_ptr<wasmtime_moduletype_t, deleter> ptr;
-
-  ModuleType(wasmtime_moduletype_t *ptr) : ptr(ptr) {}
 
 public:
   class Ref {
@@ -654,12 +690,13 @@ public:
     }
   };
 
-  Ref* operator->() {
-    return reinterpret_cast<Ref*>(&ptr);
-  }
-  Ref* operator*() {
-    return reinterpret_cast<Ref*>(&ptr);
-  }
+private:
+  Ref ref;
+  ModuleType(wasmtime_moduletype_t *ptr) : ptr(ptr), ref(ptr) {}
+public:
+
+  Ref* operator->() { return &ref; }
+  Ref* operator*() { return &ref; }
 };
 
 class InstanceType {
@@ -672,8 +709,6 @@ class InstanceType {
   };
 
   std::unique_ptr<wasmtime_instancetype_t, deleter> ptr;
-
-  InstanceType(wasmtime_instancetype_t *ptr) : ptr(ptr) {}
 
 public:
   class Ref {
@@ -692,12 +727,13 @@ public:
     }
   };
 
-  Ref* operator->() {
-    return reinterpret_cast<Ref*>(&ptr);
-  }
-  Ref* operator*() {
-    return reinterpret_cast<Ref*>(&ptr);
-  }
+private:
+  Ref ref;
+  InstanceType(wasmtime_instancetype_t *ptr) : ptr(ptr), ref(ptr) {}
+public:
+
+  Ref* operator->() { return &ref; }
+  Ref* operator*() { return &ref; }
 };
 
 class ExternType {
@@ -736,8 +772,12 @@ private:
       case WASM_EXTERN_MEMORY:
         return wasm_externtype_as_memorytype_const(ptr);
       case WASMTIME_EXTERN_MODULE:
+        // Should probably just add const versions of these functions to
+        // wasmtime's C API?
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
         return wasmtime_externtype_as_moduletype(const_cast<wasm_externtype_t*>(ptr));
       case WASMTIME_EXTERN_INSTANCE:
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
         return wasmtime_externtype_as_instancetype(const_cast<wasm_externtype_t*>(ptr));
     }
     std::abort();
@@ -753,16 +793,18 @@ public:
   size_t module_offset() const { return wasm_frame_module_offset(frame); }
 
   std::optional<std::string_view> func_name() const {
-    auto name = wasmtime_frame_func_name(frame);
-    if (name)
+    const auto *name = wasmtime_frame_func_name(frame);
+    if (name != nullptr) {
       return std::string_view(name->data, name->size);
+    }
     return std::nullopt;
   }
 
   std::optional<std::string_view> module_name() const {
-    auto name = wasmtime_frame_module_name(frame);
-    if (name)
+    const auto *name = wasmtime_frame_module_name(frame);
+    if (name != nullptr) {
       return std::string_view(name->data, name->size);
+    }
     return std::nullopt;
   }
 };
@@ -778,10 +820,15 @@ public:
     wasm_frame_vec_delete(&vec);
   }
 
+  Trace(const Trace &other) = delete;
+  Trace(Trace &&other) = delete;
+  Trace &operator=(const Trace &other) = delete;
+  Trace &operator=(Trace &&other) = delete;
+
   typedef const FrameRef* iterator;
 
-  iterator begin() const { return reinterpret_cast<FrameRef*>(&vec.data[0]); }
-  iterator end() const { return reinterpret_cast<FrameRef*>(&vec.data[vec.size]); }
+  iterator begin() const { return reinterpret_cast<FrameRef*>(&vec.data[0]); } // NOLINT
+  iterator end() const { return reinterpret_cast<FrameRef*>(&vec.data[vec.size]); } // NOLINT
   size_t size() const { return vec.size; }
 };
 
@@ -809,9 +856,10 @@ public:
   }
 
   std::optional<int32_t> i32_exit() const {
-    int32_t status;
-    if (wasmtime_trap_exit_status(ptr.get(), &status))
+    int32_t status = 0;
+    if (wasmtime_trap_exit_status(ptr.get(), &status)) {
       return status;
+    }
     return std::nullopt;
   }
 
@@ -829,10 +877,12 @@ struct TrapError {
   TrapError(Error e) : data(std::move(e)) {}
 
   std::string message() {
-    if (auto trap = std::get_if<Trap>(&data))
+    if (auto *trap = std::get_if<Trap>(&data)) {
       return trap->message();
-    if (auto error = std::get_if<Error>(&data))
+    }
+    if (auto *error = std::get_if<Error>(&data)) {
       return std::string(error->message());
+    }
     std::abort();
   }
 };
@@ -857,35 +907,51 @@ class Module {
 
 public:
   Module(const Module &other) : ptr(wasmtime_module_clone(other.ptr.get())) {}
+  Module &operator=(const Module &other) {
+    ptr.reset(wasmtime_module_clone(other.ptr.get()));
+    return *this;
+  }
+  ~Module() = default;
+  Module(Module &&other) = default;
+  Module &operator=(Module &&other) = default;
 
+
+  [[nodiscard]]
   static Result<Module> compile(Engine &engine, std::string_view wat) {
     auto wasm = wat2wasm(wat);
-    if (!wasm)
+    if (!wasm) {
       return wasm.err();
+    }
     auto bytes = wasm.ok();
     return compile(engine, bytes);
   }
 
+  [[nodiscard]]
   static Result<Module> compile(Engine &engine, std::span<uint8_t> wasm) {
-    wasmtime_module_t *ret;
-    auto error = wasmtime_module_new(engine.ptr.get(), wasm.data(), wasm.size(), &ret);
-    if (error)
+    wasmtime_module_t *ret = nullptr;
+    auto *error = wasmtime_module_new(engine.ptr.get(), wasm.data(), wasm.size(), &ret);
+    if (error != nullptr) {
       return Error(error);
+    }
     return Module(ret);
   }
 
+  [[nodiscard]]
   static Result<std::monostate> validate(Engine &engine, std::span<uint8_t> wasm) {
-    auto error = wasmtime_module_validate(engine.ptr.get(), wasm.data(), wasm.size());
-    if (error)
+    auto *error = wasmtime_module_validate(engine.ptr.get(), wasm.data(), wasm.size());
+    if (error != nullptr) {
       return Error(error);
+    }
     return std::monostate();
   }
 
+  [[nodiscard]]
   static Result<Module> deserialize(Engine &engine, std::span<uint8_t> wasm) {
-    wasmtime_module_t *ret;
-    auto error = wasmtime_module_deserialize(engine.ptr.get(), wasm.data(), wasm.size(), &ret);
-    if (error)
+    wasmtime_module_t *ret = nullptr;
+    auto *error = wasmtime_module_deserialize(engine.ptr.get(), wasm.data(), wasm.size(), &ret);
+    if (error != nullptr) {
       return Error(error);
+    }
     return Module(ret);
   }
 
@@ -893,13 +959,17 @@ public:
     return wasmtime_module_type(ptr.get());
   }
 
+  [[nodiscard]]
   Result<std::vector<uint8_t>> serialize() const {
     wasm_byte_vec_t bytes;
-    auto error = wasmtime_module_serialize(ptr.get(), &bytes);
-    if (error)
+    auto *error = wasmtime_module_serialize(ptr.get(), &bytes);
+    if (error != nullptr) {
       return Error(error);
+    }
     std::vector<uint8_t> ret;
-    ret.assign(bytes.data, bytes.data + bytes.size);
+    // NOLINTNEXTLINE TODO can this be done without triggering lints?
+    std::span<uint8_t> raw(reinterpret_cast<uint8_t*>(bytes.data), bytes.size);
+    ret.assign(raw.begin(), raw.end());
     wasm_byte_vec_delete(&bytes);
     return ret;
   }
@@ -939,10 +1009,12 @@ class WasiConfig {
 public:
   WasiConfig() : ptr(wasi_config_new()) {}
 
-  void argv(std::vector<std::string> &args) {
+  void argv(const std::vector<std::string> &args) {
     std::vector<const char*> ptrs;
-    for (auto arg : args)
+    ptrs.reserve(args.size());
+    for (const auto &arg : args) {
       ptrs.push_back(arg.c_str());
+    }
 
     wasi_config_set_argv(ptr.get(), (int) args.size(), ptrs.data());
   }
@@ -951,7 +1023,7 @@ public:
     wasi_config_inherit_argv(ptr.get());
   }
 
-  void env(std::vector<std::pair<std::string, std::string>> &env) {
+  void env(const std::vector<std::pair<std::string, std::string>> &env) {
     std::vector<const char*> names;
     std::vector<const char*> values;
     for (auto [name, value] : env) {
@@ -1024,31 +1096,37 @@ public:
       wasmtime_context_gc(ptr);
     }
 
+    [[nodiscard]]
     Result<std::monostate> add_fuel(uint64_t fuel) {
-      auto error = wasmtime_context_add_fuel(ptr, fuel);
-      if (error)
+      auto *error = wasmtime_context_add_fuel(ptr, fuel);
+      if (error != nullptr) {
         return Error(error);
+      }
       return std::monostate();
     }
 
     std::optional<uint64_t> fuel_consumed() const {
-      uint64_t fuel;
-      if (wasmtime_context_fuel_consumed(ptr, &fuel))
+      uint64_t fuel = 0;
+      if (wasmtime_context_fuel_consumed(ptr, &fuel)) {
         return fuel;
+      }
       return std::nullopt;
     }
 
+    [[nodiscard]]
     Result<std::monostate> set_wasi(WasiConfig config) {
-      auto error = wasmtime_context_set_wasi(ptr, config.ptr.release());
-      if (error)
+      auto *error = wasmtime_context_set_wasi(ptr, config.ptr.release());
+      if (error != nullptr) {
         return Error(error);
+      }
       return std::monostate();
     }
 
     std::optional<InterruptHandle> interrupt_handle() {
-      auto handle = wasmtime_interrupt_handle_new(ptr);
-      if (handle)
+      auto *handle = wasmtime_interrupt_handle_new(ptr);
+      if (handle != nullptr) {
         return InterruptHandle(handle);
+      }
       return std::nullopt;
     }
   };
@@ -1070,18 +1148,25 @@ class ExternRef {
   std::unique_ptr<wasmtime_externref_t, deleter> ptr;
 
   static void finalizer(void *ptr) {
-    std::unique_ptr<std::any> _ptr(reinterpret_cast<std::any*>(ptr));
+    std::unique_ptr<std::any> _ptr(static_cast<std::any*>(ptr));
   }
 
   ExternRef(wasmtime_externref_t *ptr) : ptr(ptr) {}
 public:
   ExternRef(std::any val)
-    : ExternRef(wasmtime_externref_new(std::make_unique<std::any>(val).release(), finalizer))
+    : ExternRef(wasmtime_externref_new(std::make_unique<std::any>(std::move(val)).release(), finalizer))
   {}
   ExternRef(const ExternRef &other) : ExternRef(wasmtime_externref_clone(other.ptr.get())) {}
+  ExternRef &operator=(const ExternRef &other) {
+    ptr.reset(wasmtime_externref_clone(other.ptr.get()));
+    return *this;
+  }
+  ExternRef(ExternRef &&other) = default;
+  ExternRef &operator=(ExternRef &&other) = default;
+  ~ExternRef() = default;
 
   std::any &data() {
-    return *reinterpret_cast<std::any*>(wasmtime_externref_data(ptr.get()));
+    return *static_cast<std::any*>(wasmtime_externref_data(ptr.get()));
   }
 };
 
@@ -1101,10 +1186,10 @@ public:
   Val(int64_t i64) : val({.kind = WASMTIME_I64, .of = {.i64 = i64}}) {}
   Val(float f32) : val({.kind = WASMTIME_F32, .of = {.f32 = f32}}) {}
   Val(double f64) : val({.kind = WASMTIME_F64, .of = {.f64 = f64}}) {}
-  Val(uint8_t v128[16]) : val({.kind = WASMTIME_V128}) {
-    memcpy(val.of.v128, v128, 16);
+  Val(wasmtime_v128 v128) : val({.kind = WASMTIME_V128}) {
+    memcpy(&val.of.v128[0], v128, sizeof(wasmtime_v128));
   }
-  Val(std::optional<Func*>);
+  Val(std::optional<Func*> func);
   Val(std::optional<ExternRef> ptr) : val({.kind = WASMTIME_EXTERNREF}) {
     if (ptr) {
       val.of.externref = ptr->ptr.release();
@@ -1112,15 +1197,15 @@ public:
       val.of.externref = nullptr;
     }
   }
-  Val(const Val &other) { wasmtime_val_copy(&val, &other.val); }
-  Val(Val &&other) { std::swap(val, other.val); }
+  Val(const Val &other) : val({.kind = WASMTIME_I32}) { wasmtime_val_copy(&val, &other.val); }
+  Val(Val &&other) noexcept : val({.kind = WASMTIME_I32}) { std::swap(val, other.val); }
 
   ~Val() { wasmtime_val_delete(&val); }
 
-  void operator=(const Val &other) = delete;
-  void operator=(Val &&other) = delete;
+  Val &operator=(const Val &other) = delete;
+  Val &operator=(Val &&other) = delete;
 
-  ValKind Kind() {
+  ValKind Kind() const {
     switch (val.kind) {
       case WASMTIME_I32: return KindI32;
       case WASMTIME_I64: return KindI64;
@@ -1133,45 +1218,52 @@ public:
     std::abort();
   }
 
-  int32_t i32() {
-    if (val.kind != WASMTIME_I32)
+  int32_t i32() const {
+    if (val.kind != WASMTIME_I32) {
       std::abort();
+    }
     return val.of.i32;
   }
 
-  int64_t i64() {
-    if (val.kind != WASMTIME_I64)
+  int64_t i64() const {
+    if (val.kind != WASMTIME_I64) {
       std::abort();
+    }
     return val.of.i64;
   }
 
-  float f32() {
-    if (val.kind != WASMTIME_F32)
+  float f32() const {
+    if (val.kind != WASMTIME_F32) {
       std::abort();
+    }
     return val.of.f32;
   }
 
-  double f64() {
-    if (val.kind != WASMTIME_F64)
+  double f64() const {
+    if (val.kind != WASMTIME_F64) {
       std::abort();
+    }
     return val.of.f64;
   }
 
-  uint8_t *v128() {
-    if (val.kind != WASMTIME_V128)
+  const uint8_t *v128() const {
+    if (val.kind != WASMTIME_V128) {
       std::abort();
-    return val.of.v128;
+    }
+    return &val.of.v128[0];
   }
 
-  std::optional<ExternRef> externref() {
-    if (val.kind != WASMTIME_EXTERNREF)
+  std::optional<ExternRef> externref() const {
+    if (val.kind != WASMTIME_EXTERNREF) {
       std::abort();
-    if (val.of.externref)
+    }
+    if (val.of.externref != nullptr) {
       return ExternRef(wasmtime_externref_clone(val.of.externref));
+    }
     return std::nullopt;
   }
 
-  std::optional<Func> func();
+  std::optional<Func> func() const;
 };
 
 class Global {
@@ -1181,11 +1273,13 @@ class Global {
 public:
   Global(wasmtime_global_t global) : global(global) {}
 
+  [[nodiscard]]
   static Result<Global> create(Store::Context cx, const GlobalType &ty, const Val &init) {
     wasmtime_global_t global;
-    auto error = wasmtime_global_new(cx.ptr, ty.ptr.get(), &init.val, &global);
-    if (error)
+    auto *error = wasmtime_global_new(cx.ptr, ty.ptr.get(), &init.val, &global);
+    if (error != nullptr) {
       return Error(error);
+    }
     return Global(global);
   }
 
@@ -1199,10 +1293,12 @@ public:
     return val;
   }
 
+  [[nodiscard]]
   Result<std::monostate> set(Store::Context cx, const Val &val) const {
-    auto error = wasmtime_global_set(cx.ptr, &global, &val.val);
-    if (error)
+    auto *error = wasmtime_global_set(cx.ptr, &global, &val.val);
+    if (error != nullptr) {
       return Error(error);
+    }
     return std::monostate();
   }
 };
@@ -1214,11 +1310,13 @@ class Table {
 public:
   Table(wasmtime_table_t table) : table(table) {}
 
+  [[nodiscard]]
   static Result<Table> create(Store::Context cx, const TableType &ty, const Val &init) {
     wasmtime_table_t table;
-    auto error = wasmtime_table_new(cx.ptr, ty.ptr.get(), &init.val, &table);
-    if (error)
+    auto *error = wasmtime_table_new(cx.ptr, ty.ptr.get(), &init.val, &table);
+    if (error != nullptr) {
       return Error(error);
+    }
     return Table(table);
   }
 
@@ -1232,23 +1330,28 @@ public:
 
   std::optional<Val> get(Store::Context cx, uint32_t idx) const {
     Val val;
-    if (wasmtime_table_get(cx.ptr, &table, idx, &val.val))
+    if (wasmtime_table_get(cx.ptr, &table, idx, &val.val)) {
       return val;
+    }
     return std::nullopt;
   }
 
+  [[nodiscard]]
   Result<std::monostate> set(Store::Context cx, uint32_t idx, const Val &val) const {
-    auto error = wasmtime_table_set(cx.ptr, &table, idx, &val.val);
-    if (error)
+    auto *error = wasmtime_table_set(cx.ptr, &table, idx, &val.val);
+    if (error != nullptr) {
       return Error(error);
+    }
     return std::monostate();
   }
 
+  [[nodiscard]]
   Result<uint32_t> grow(Store::Context cx, uint32_t delta, const Val &init) const {
-    uint32_t prev;
-    auto error = wasmtime_table_grow(cx.ptr, &table, delta, &init.val, &prev);
-    if (error)
+    uint32_t prev = 0;
+    auto *error = wasmtime_table_grow(cx.ptr, &table, delta, &init.val, &prev);
+    if (error != nullptr) {
       return Error(error);
+    }
     return prev;
   }
 };
@@ -1260,11 +1363,13 @@ class Memory {
 public:
   Memory(wasmtime_memory_t memory) : memory(memory) {}
 
+  [[nodiscard]]
   static Result<Memory> create(Store::Context cx, const MemoryType &ty) {
     wasmtime_memory_t memory;
-    auto error = wasmtime_memory_new(cx.ptr, ty.ptr.get(), &memory);
-    if (error)
+    auto *error = wasmtime_memory_new(cx.ptr, ty.ptr.get(), &memory);
+    if (error != nullptr) {
       return Error(error);
+    }
     return Memory(memory);
   }
 
@@ -1277,16 +1382,18 @@ public:
   }
 
   std::span<uint8_t> data(Store::Context cx) const {
-    auto base = wasmtime_memory_data(cx.ptr, &memory);
+    auto *base = wasmtime_memory_data(cx.ptr, &memory);
     auto size = wasmtime_memory_data_size(cx.ptr, &memory);
     return {base, size};
   }
 
+  [[nodiscard]]
   Result<uint32_t> grow(Store::Context cx, uint32_t delta) const {
-    uint32_t prev;
-    auto error = wasmtime_memory_grow(cx.ptr, &memory, delta, &prev);
-    if (error)
+    uint32_t prev = 0;
+    auto *error = wasmtime_memory_grow(cx.ptr, &memory, delta, &prev);
+    if (error != nullptr) {
       return Error(error);
+    }
     return prev;
   }
 };
@@ -1303,21 +1410,24 @@ public:
   // TODO
   /* static Result<Func> create(Store::Context cx, const FuncType &ty) { */
   /*   wasmtime_func_t func; */
-  /*   auto error = wasmtime_func_new(cx.ptr, ty.ptr.get(), &func); */
-  /*   if (error) */
+  /*   auto *error = wasmtime_func_new(cx.ptr, ty.ptr.get(), &func); */
+  /*   if (error != nullptr) */
   /*     return Error(error); */
   /*   return Func(func); */
   /* } */
 
+  [[nodiscard]]
   TrapResult<std::vector<Val>> call(Store::Context cx, const std::vector<Val> &params) {
     std::vector<wasmtime_val_t> raw_params;
-    for (auto param : params)
+    raw_params.reserve(params.size());
+    for (const auto &param : params) {
       raw_params.push_back(param.val);
+    }
     size_t nresults = this->type(cx)->results().size();
     std::vector<wasmtime_val_t> raw_results(nresults);
 
     wasm_trap_t *trap = nullptr;
-    auto error = wasmtime_func_call(
+    auto *error = wasmtime_func_call(
         cx.ptr,
         &func,
         raw_params.data(),
@@ -1326,14 +1436,18 @@ public:
         raw_results.capacity(),
         &trap
     );
-    if (error)
+    if (error != nullptr) {
       return TrapError(Error(error));
-    if (trap)
+    }
+    if (trap != nullptr) {
       return TrapError(Trap(trap));
+    }
 
     std::vector<Val> results;
-    for (size_t i = 0; i < nresults; i++)
-      results.push_back(raw_results.data()[i]);
+    results.reserve(nresults);
+    for (size_t i = 0; i < nresults; i++) {
+      results.push_back(raw_results[i]);
+    }
     return results;
   }
 
@@ -1343,25 +1457,21 @@ public:
 };
 
 Val::Val(std::optional<Func*> func) : val({.kind = WASMTIME_FUNCREF}) {
-  if (!func)
+  if (!func) {
     return;
+  }
   val.of.funcref = (**func).func;
 }
 
-std::optional<Func> Val::func() {
-  if (val.kind != WASMTIME_FUNCREF)
+std::optional<Func> Val::func() const {
+  if (val.kind != WASMTIME_FUNCREF) {
     std::abort();
-  if (val.of.funcref.store_id == 0)
+  }
+  if (val.of.funcref.store_id == 0) {
     return std::nullopt;
+  }
   return Func(val.of.funcref);
 }
-
-class Foo {
-  class Bar {
-    Bar();
-  };
-};
-
 
 class Instance;
 
@@ -1386,22 +1496,22 @@ class Instance {
   }
 
   static void cvt(Extern &e, wasmtime_extern_t &raw) {
-    if (auto func = std::get_if<Func>(&e)) {
+    if (auto *func = std::get_if<Func>(&e)) {
       raw.kind = WASMTIME_EXTERN_FUNC;
       raw.of.func = func->func;
-    } else if (auto global = std::get_if<Global>(&e)) {
+    } else if (auto *global = std::get_if<Global>(&e)) {
       raw.kind = WASMTIME_EXTERN_GLOBAL;
       raw.of.global = global->global;
-    } else if (auto table = std::get_if<Table>(&e)) {
+    } else if (auto *table = std::get_if<Table>(&e)) {
       raw.kind = WASMTIME_EXTERN_TABLE;
       raw.of.table = table->table;
-    } else if (auto memory = std::get_if<Memory>(&e)) {
+    } else if (auto *memory = std::get_if<Memory>(&e)) {
       raw.kind = WASMTIME_EXTERN_MEMORY;
       raw.of.memory = memory->memory;
-    } else if (auto instance = std::get_if<Instance>(&e)) {
+    } else if (auto *instance = std::get_if<Instance>(&e)) {
       raw.kind = WASMTIME_EXTERN_INSTANCE;
       raw.of.instance = instance->instance;
-    } else if (auto module = std::get_if<Module>(&e)) {
+    } else if (auto *module = std::get_if<Module>(&e)) {
       raw.kind = WASMTIME_EXTERN_MODULE;
       raw.of.module = module->ptr.get();
     } else {
@@ -1412,6 +1522,7 @@ class Instance {
 public:
   Instance(wasmtime_instance_t instance) : instance(instance) {}
 
+  [[nodiscard]]
   static TrapResult<Instance> create(
     Store::Context cx,
     const Module &m,
@@ -1425,11 +1536,13 @@ public:
     }
     wasmtime_instance_t instance;
     wasm_trap_t *trap = nullptr;
-    auto error = wasmtime_instance_new(cx.ptr, m.ptr.get(), raw_imports.data(), raw_imports.size(), &instance, &trap);
-    if (error)
+    auto *error = wasmtime_instance_new(cx.ptr, m.ptr.get(), raw_imports.data(), raw_imports.size(), &instance, &trap);
+    if (error != nullptr) {
       return TrapError(Error(error));
-    if (trap)
+    }
+    if (trap != nullptr) {
       return TrapError(Trap(trap));
+    }
     return Instance(instance);
   }
 
@@ -1439,17 +1552,22 @@ public:
 
   std::optional<Extern> get(Store::Context cx, std::string_view name) {
     wasmtime_extern_t e;
-    if (!wasmtime_instance_export_get(cx.ptr, &instance, name.data(), name.size(), &e))
+    if (!wasmtime_instance_export_get(cx.ptr, &instance, name.data(), name.size(), &e)) {
       return std::nullopt;
+    }
     return Instance::cvt(e);
   }
 
   std::optional<std::pair<std::string_view, Extern>> get(Store::Context cx, size_t idx) {
     wasmtime_extern_t e;
-    char *name;
-    size_t len;
-    if (!wasmtime_instance_export_nth(cx.ptr, &instance, idx, &name, &len, &e))
+    // I'm not sure why clang-tidy thinks this is using va_list or anything
+    // related to that...
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
+    char *name = nullptr;
+    size_t len = 0;
+    if (!wasmtime_instance_export_nth(cx.ptr, &instance, idx, &name, &len, &e)) {
       return std::nullopt;
+    }
     std::string_view n(name, len);
     return std::pair(n, Instance::cvt(e));
   }
@@ -1471,59 +1589,74 @@ public:
     wasmtime_linker_allow_shadowing(ptr.get(), allow);
   }
 
+  [[nodiscard]]
   Result<std::monostate> define(std::string_view module, std::string_view name, Extern &item) {
     wasmtime_extern_t raw;
     Instance::cvt(item, raw);
-    auto error = wasmtime_linker_define(ptr.get(), module.data(), module.size(), name.data(), name.size(), &raw);
-    if (error)
+    auto *error = wasmtime_linker_define(ptr.get(), module.data(), module.size(), name.data(), name.size(), &raw);
+    if (error != nullptr) {
       return Error(error);
+    }
     return std::monostate();
   }
 
+  [[nodiscard]]
   Result<std::monostate> define_wasi() {
-    auto error = wasmtime_linker_define_wasi(ptr.get());
-    if (error)
+    auto *error = wasmtime_linker_define_wasi(ptr.get());
+    if (error != nullptr) {
       return Error(error);
+    }
     return std::monostate();
   }
 
+  [[nodiscard]]
   Result<std::monostate> define_instance(Store::Context cx, std::string_view name, Instance instance) {
-    auto error = wasmtime_linker_define_instance(ptr.get(), cx.ptr, name.data(), name.size(), &instance.instance);
-    if (error)
+    auto *error = wasmtime_linker_define_instance(ptr.get(), cx.ptr, name.data(), name.size(), &instance.instance);
+    if (error != nullptr) {
       return Error(error);
+    }
     return std::monostate();
   }
 
+  [[nodiscard]]
   TrapResult<Instance> instantiate(Store::Context cx, const Module &m) {
     wasmtime_instance_t instance;
     wasm_trap_t *trap = nullptr;
-    auto error = wasmtime_linker_instantiate(ptr.get(), cx.ptr, m.ptr.get(), &instance, &trap);
-    if (error)
+    auto *error = wasmtime_linker_instantiate(ptr.get(), cx.ptr, m.ptr.get(), &instance, &trap);
+    if (error != nullptr) {
       return TrapError(Error(error));
-    if (trap)
+    }
+    if (trap != nullptr) {
       return TrapError(Trap(trap));
+    }
     return Instance(instance);
   }
 
+  [[nodiscard]]
   Result<std::monostate> module(Store::Context cx, std::string_view name, const Module &m) {
-    auto error = wasmtime_linker_module(ptr.get(), cx.ptr, name.data(), name.size(), m.ptr.get());
-    if (error)
+    auto *error = wasmtime_linker_module(ptr.get(), cx.ptr, name.data(), name.size(), m.ptr.get());
+    if (error != nullptr) {
       return Error(error);
+    }
     return std::monostate();
   }
 
+  [[nodiscard]]
   std::optional<Extern> get(Store::Context cx, std::string_view module, std::string_view name) {
     wasmtime_extern_t item;
-    if (wasmtime_linker_get(ptr.get(), cx.ptr, module.data(), module.size(), name.data(), name.size(), &item))
+    if (wasmtime_linker_get(ptr.get(), cx.ptr, module.data(), module.size(), name.data(), name.size(), &item)) {
       return Instance::cvt(item);
+    }
     return std::nullopt;
   }
 
+  [[nodiscard]]
   Result<Func> get_default(Store::Context cx, std::string_view name) {
     wasmtime_func_t item;
-    auto error = wasmtime_linker_get_default(ptr.get(), cx.ptr, name.data(), name.size(), &item);
-    if (error)
+    auto *error = wasmtime_linker_get_default(ptr.get(), cx.ptr, name.data(), name.size(), &item);
+    if (error != nullptr) {
       return Error(error);
+    }
     return Func(item);
   }
 };

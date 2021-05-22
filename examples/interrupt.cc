@@ -29,8 +29,9 @@ using namespace wasmtime;
 
 template<typename T, typename E>
 T unwrap(Result<T, E> result) {
-  if (result)
+  if (result) {
     return result.ok();
+  }
   std::cerr << "error: " << result.err().message() << "\n";
   std::abort();
 }
