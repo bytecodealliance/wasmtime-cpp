@@ -8,15 +8,33 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
-        config: [Debug, Release]
         include:
+        # linux debug/release
+        - os: ubuntu-latest
+          config: Release
+        - os: ubuntu-latest
+          config: Debug
+
+        # macos debug/release
+        - os: macos-latest
+          config: Release
+        - os: macos-latest
+          config: Debug
+
+        # clang-tidy
+        - os: macos-latest
+          config: Debug
+          args: -DENABLE_CODE_ANALYSIS=YES
+
+        # clang-cl debug/release
         - os: windows-latest
           config: Debug
           args: -T ClangCL
         - os: windows-latest
           config: Release
           args: -T ClangCL
+
+        # cl.exe debug/release
         - os: windows-latest
           config: Debug
         - os: windows-latest
@@ -44,13 +62,12 @@ jobs:
     - run: cmake -B build ${{ matrix.args }}
       if: matrix.os == 'windows-latest'
 
-    - run: |
-        sudo apt-get update -y
-        sudo apt-get install clang-tidy
-        cmake -B build -DCMAKE_CXX_COMPILER=clang -DCMAKE_BUILD_TYPE=${{ matrix.config }}
+    - run: cmake -B build -DCMAKE_CXX_COMPILER=clang -DCMAKE_BUILD_TYPE=${{ matrix.config }}
       if: matrix.os == 'ubuntu-latest'
 
-    - run: cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.config }}
+    - run: echo /usr/local/opt/llvm/bin >> $GITHUB_PATH
+      if: matrix.os == 'macos-latest'
+    - run: cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.config }} ${{ matrix.args }}
       if: matrix.os == 'macos-latest'
 
     # and build!
