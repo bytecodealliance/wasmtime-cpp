@@ -4,11 +4,13 @@
 #include <any>
 #include <initializer_list>
 #include <iostream>
+#include <memory>
 #include <optional>
+#include <span>
 #include <variant>
 #include <vector>
-#include <span>
-#include <wasmtime.h>
+
+#include "wasmtime.h"
 
 namespace wasmtime {
 
@@ -17,10 +19,10 @@ class Error {
 
 public:
   Error(wasmtime_error_t *error) {
-    wasm_byte_vec_t msg;
-    wasmtime_error_message(error, &msg);
-    this->msg = std::string(msg.data, msg.size);
-    wasm_byte_vec_delete(&msg);
+    wasm_byte_vec_t msg_bytes;
+    wasmtime_error_message(error, &msg_bytes);
+    msg = std::string(msg_bytes.data, msg_bytes.size);
+    wasm_byte_vec_delete(&msg_bytes);
     wasmtime_error_delete(error);
   }
 
@@ -112,7 +114,7 @@ public:
   };
 
   Result<std::monostate> strategy(Strategy strategy) {
-    auto error = wasmtime_config_strategy_set(ptr.get(), strategy);
+    auto error = wasmtime_config_strategy_set(ptr.get(), (wasmtime_strategy_t) strategy);
     if (error)
       return Error(error);
     return std::monostate();
@@ -129,7 +131,7 @@ public:
   };
 
   void cranelift_opt_level(OptLevel level) {
-    wasmtime_config_cranelift_opt_level_set(ptr.get(), level);
+    wasmtime_config_cranelift_opt_level_set(ptr.get(), (wasmtime_opt_level_t) level);
   }
 
   enum ProfilingStrategy {
@@ -139,7 +141,7 @@ public:
   };
 
   Result<std::monostate> profiler(ProfilingStrategy profiler) {
-    auto error = wasmtime_config_profiler_set(ptr.get(), profiler);
+    auto error = wasmtime_config_profiler_set(ptr.get(), (wasmtime_profiling_strategy_t) profiler);
     if (error)
       return Error(error);
     return std::monostate();
@@ -434,7 +436,7 @@ public:
   };
 
   GlobalType(ValType ty, bool mut)
-    : GlobalType(wasm_globaltype_new(ty.ptr.release(), mut ? WASM_VAR : WASM_CONST))
+    : GlobalType(wasm_globaltype_new(ty.ptr.release(), (wasm_mutability_t) (mut ? WASM_VAR : WASM_CONST)))
   {}
   GlobalType(const GlobalType &other) : GlobalType(wasm_globaltype_copy(other.ptr.get())) {}
   GlobalType(Ref other) : GlobalType(wasm_globaltype_copy(other.ptr)) {}
@@ -942,7 +944,7 @@ public:
     for (auto arg : args)
       ptrs.push_back(arg.c_str());
 
-    wasi_config_set_argv(ptr.get(), args.size(), ptrs.data());
+    wasi_config_set_argv(ptr.get(), (int) args.size(), ptrs.data());
   }
 
   void inherit_argv() {
@@ -956,7 +958,7 @@ public:
       names.push_back(name.c_str());
       values.push_back(value.c_str());
     }
-    wasi_config_set_env(ptr.get(), env.size(), names.data(), values.data());
+    wasi_config_set_env(ptr.get(), (int) env.size(), names.data(), values.data());
   }
 
   void inherit_env() {
