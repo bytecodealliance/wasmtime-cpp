@@ -1160,6 +1160,8 @@ public:
     memcpy(&val.of.v128[0], v128, sizeof(wasmtime_v128));
   }
   Val(std::optional<Func *> func);
+  Val(ExternRef ptr)
+      : val({.kind = WASMTIME_EXTERNREF, .of = {.externref = ptr.ptr.release()}}) {}
   Val(std::optional<ExternRef> ptr)
       : val({.kind = WASMTIME_EXTERNREF, .of = {.externref = nullptr}}) {
     if (ptr) {

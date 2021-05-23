@@ -1,22 +1,3 @@
-/*
-Example of compiling, instantiating, and linking two WebAssembly modules
-together.
-
-You can compile and run this example on Linux with:
-
-   cargo build --release -p wasmtime-c-api
-   c++ examples/linking.cc -std=c++20 \
-       -I crates/c-api/include \
-       -I crates/c-api/wasm-c-api/include \
-       target/release/libwasmtime.a \
-       -lpthread -ldl -lm \
-       -o linking
-   ./linking
-
-Note that on Windows and macOS the command will be similar, but you'll need
-to tweak the `-lpthread` and such annotations.
-*/
-
 #include <fstream>
 #include <iostream>
 #include <sstream>
