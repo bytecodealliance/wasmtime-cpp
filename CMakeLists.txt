@@ -35,9 +35,9 @@ function(configure_wasmtime_target name)
 endfunction()
 
 
+enable_testing()
 add_subdirectory(examples)
 
-enable_testing()
 add_executable(test-all tests/all.cc)
 add_test(NAME smoke COMMAND test-all)
 configure_wasmtime_target(test-all)

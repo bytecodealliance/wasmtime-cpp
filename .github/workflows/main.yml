@@ -72,4 +72,6 @@ jobs:
 
     - run: cmake --build build --config ${{ matrix.config }} --verbose
     - run: cmake --build build --config ${{ matrix.config }} --verbose --target test
+      env:
+        CTEST_OUTPUT_ON_FAILURE: 1
 
