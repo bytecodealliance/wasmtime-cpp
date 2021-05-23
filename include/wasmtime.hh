@@ -841,7 +841,9 @@ public:
   std::string message() const {
     wasm_byte_vec_t msg;
     wasm_trap_message(ptr.get(), &msg);
-    return std::string(msg.data, msg.size);
+    std::string ret(msg.data, msg.size);
+    wasm_byte_vec_delete(&msg);
+    return ret;
   }
 
   std::optional<int32_t> i32_exit() const {
