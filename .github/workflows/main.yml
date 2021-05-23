@@ -3,6 +3,12 @@ name: CI
 on: [push]
 
 jobs:
+  format:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v2
+    - run: /usr/local/opt/llvm/bin/clang-format include/wasmtime.hh --dry-run --Werror
+
   test:
     runs-on: ${{ matrix.os }}
     strategy:
