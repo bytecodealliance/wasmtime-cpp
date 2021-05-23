@@ -1431,7 +1431,8 @@ public:
   }
 };
 
-Val::Val(std::optional<Func *> func) : val({.kind = WASMTIME_FUNCREF}) {
+Val::Val(std::optional<Func *> func)
+    : val({.kind = WASMTIME_FUNCREF, .of = {.i32 = 0}}) {
   if (!func) {
     return;
   }
