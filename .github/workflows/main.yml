@@ -23,6 +23,14 @@ jobs:
           config: Debug
           args: -DCMAKE_CXX_COMPILER=clang
 
+        # sanitizers
+        - os: ubuntu-latest
+          config: Debug
+          args: -DCMAKE_CXX_COMPILER=clang -DCMAKE_CXX_FLAGS="-fsanitize=address -fno-omit-frame-pointer"
+        - os: ubuntu-latest
+          config: Debug
+          args: -DCMAKE_CXX_COMPILER=clang -DCMAKE_CXX_FLAGS="-fsanitize=memory -fno-omit-frame-pointer"
+
         # linux/gcc debug/release
         - os: ubuntu-latest
           config: Release
