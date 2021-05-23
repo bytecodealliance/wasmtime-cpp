@@ -18,16 +18,20 @@ jobs:
         # linux debug/release
         - os: ubuntu-latest
           config: Release
+          args: -DCMAKE_CXX_COMPILER=clang
         - os: ubuntu-latest
           config: Debug
+          args: -DCMAKE_CXX_COMPILER=clang
 
         # linux/gcc debug/release
         - os: ubuntu-latest
           config: Release
           gcc: true
+          args: -DCMAKE_CXX_COMPILER=gcc-10
         - os: ubuntu-latest
           config: Debug
           gcc: true
+          args: -DCMAKE_CXX_COMPILER=gcc-10
 
         # macos debug/release
         - os: macos-latest
@@ -73,13 +77,13 @@ jobs:
       if: matrix.os == 'ubuntu-latest'
 
     - run: sudo apt-get update -y && sudo apt-get install -y gcc-10
-      if: matrix.gcc == 'true'
+      if: matrix.gcc
 
     # Configure CMake appropriately
     - run: cmake -B build ${{ matrix.args }}
       if: matrix.os == 'windows-latest'
 
-    - run: cmake -B build -DCMAKE_CXX_COMPILER=clang -DCMAKE_BUILD_TYPE=${{ matrix.config }}
+    - run: cmake -B build ${{ matrix.args }} -DCMAKE_BUILD_TYPE=${{ matrix.config }}
       if: matrix.os == 'ubuntu-latest'
 
     - run: echo /usr/local/opt/llvm/bin >> $GITHUB_PATH

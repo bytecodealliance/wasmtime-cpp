@@ -305,11 +305,11 @@ public:
 
     typedef const Ref *iterator;
     iterator begin() const {
-      return reinterpret_cast<Ref *>(&list->data[0]);
-    } // NOLINT
+      return reinterpret_cast<Ref *>(&list->data[0]); // NOLINT
+    }
     iterator end() const {
-      return reinterpret_cast<Ref *>(&list->data[list->size]);
-    } // NOLINT
+      return reinterpret_cast<Ref *>(&list->data[list->size]); // NOLINT
+    }
     size_t size() const { return list->size; }
   };
 
@@ -588,11 +588,11 @@ public:
 
     typedef const Ref *iterator;
     iterator begin() const {
-      return reinterpret_cast<iterator>(&list.data[0]);
-    } // NOLINT
+      return reinterpret_cast<iterator>(&list.data[0]); // NOLINT
+    }
     iterator end() const {
-      return reinterpret_cast<iterator>(&list.data[list.size]);
-    } // NOLINT
+      return reinterpret_cast<iterator>(&list.data[list.size]); // NOLINT
+    }
     size_t size() const { return list.size; }
   };
 };
@@ -638,11 +638,11 @@ public:
 
     typedef const Ref *iterator;
     iterator begin() const {
-      return reinterpret_cast<iterator>(&list.data[0]);
-    } // NOLINT
+      return reinterpret_cast<iterator>(&list.data[0]); // NOLINT
+    }
     iterator end() const {
-      return reinterpret_cast<iterator>(&list.data[list.size]);
-    } // NOLINT
+      return reinterpret_cast<iterator>(&list.data[list.size]); // NOLINT
+    }
     size_t size() const { return list.size; }
   };
 };
@@ -760,13 +760,11 @@ private:
     case WASMTIME_EXTERN_MODULE:
       // Should probably just add const versions of these functions to
       // wasmtime's C API?
-      // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
       return wasmtime_externtype_as_moduletype(
-          const_cast<wasm_externtype_t *>(ptr));
+          const_cast<wasm_externtype_t *>(ptr)); // NOLINT
     case WASMTIME_EXTERN_INSTANCE:
-      // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
       return wasmtime_externtype_as_instancetype(
-          const_cast<wasm_externtype_t *>(ptr));
+          const_cast<wasm_externtype_t *>(ptr)); // NOLINT
     }
     std::abort();
   }
@@ -815,11 +813,11 @@ public:
   typedef const FrameRef *iterator;
 
   iterator begin() const {
-    return reinterpret_cast<FrameRef *>(&vec.data[0]);
-  } // NOLINT
+    return reinterpret_cast<FrameRef *>(&vec.data[0]); // NOLINT
+  }
   iterator end() const {
-    return reinterpret_cast<FrameRef *>(&vec.data[vec.size]);
-  } // NOLINT
+    return reinterpret_cast<FrameRef *>(&vec.data[vec.size]); // NOLINT
+  }
   size_t size() const { return vec.size; }
 };
 
