@@ -71,7 +71,8 @@ jobs:
       if: matrix.os == 'macos-latest'
 
     - run: cmake --build build --config ${{ matrix.config }} --verbose
-    - run: cmake --build build --config ${{ matrix.config }} --verbose --target test
+    - run: ctest -C ${{ matrix.config }}
+      working-directory: build
       env:
         CTEST_OUTPUT_ON_FAILURE: 1
 
