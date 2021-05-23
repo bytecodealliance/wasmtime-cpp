@@ -70,6 +70,6 @@ jobs:
     - run: cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.config }} ${{ matrix.args }}
       if: matrix.os == 'macos-latest'
 
-    # and build!
     - run: cmake --build build --config ${{ matrix.config }} --verbose
+    - run: cmake --build build --config ${{ matrix.config }} --verbose --target test
 
