@@ -571,7 +571,7 @@ public:
     wasm_importtype_vec_t list;
 
   public:
-    List() : list({.size = 0}) {}
+    List() : list({.size = 0, .data = nullptr}) {}
     List(const List &other) = delete;
     List(List &&other) noexcept : list(other.list) { other.list.size = 0; }
     ~List() {
@@ -621,7 +621,7 @@ public:
     wasm_exporttype_vec_t list;
 
   public:
-    List() : list({.size = 0}) {}
+    List() : list({.size = 0, .data = nullptr}) {}
     List(const List &other) = delete;
     List(List &&other) noexcept : list(other.list) { other.list.size = 0; }
     ~List() {
@@ -1156,21 +1156,22 @@ public:
   Val(int64_t i64) : val({.kind = WASMTIME_I64, .of = {.i64 = i64}}) {}
   Val(float f32) : val({.kind = WASMTIME_F32, .of = {.f32 = f32}}) {}
   Val(double f64) : val({.kind = WASMTIME_F64, .of = {.f64 = f64}}) {}
-  Val(wasmtime_v128 v128) : val({.kind = WASMTIME_V128}) {
+  Val(wasmtime_v128 v128) : val({.kind = WASMTIME_V128, .of = {.i32 = 0}}) {
     memcpy(&val.of.v128[0], v128, sizeof(wasmtime_v128));
   }
   Val(std::optional<Func *> func);
-  Val(std::optional<ExternRef> ptr) : val({.kind = WASMTIME_EXTERNREF}) {
+  Val(std::optional<ExternRef> ptr)
+      : val({.kind = WASMTIME_EXTERNREF, .of = {.externref = nullptr}}) {
     if (ptr) {
       val.of.externref = ptr->ptr.release();
     } else {
       val.of.externref = nullptr;
     }
   }
-  Val(const Val &other) : val({.kind = WASMTIME_I32}) {
+  Val(const Val &other) : val({.kind = WASMTIME_I32, .of = {.i32 = 0}}) {
     wasmtime_val_copy(&val, &other.val);
   }
-  Val(Val &&other) noexcept : val({.kind = WASMTIME_I32}) {
+  Val(Val &&other) noexcept : val({.kind = WASMTIME_I32, .of = {.i32 = 0}}) {
     std::swap(val, other.val);
   }
 
