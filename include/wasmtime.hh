@@ -1234,11 +1234,11 @@ public:
     return val.of.f64;
   }
 
-  const uint8_t *v128() const {
+  const wasmtime_v128 &v128() const {
     if (val.kind != WASMTIME_V128) {
       std::abort();
     }
-    return &val.of.v128[0];
+    return val.of.v128;
   }
 
   std::optional<ExternRef> externref() const {
