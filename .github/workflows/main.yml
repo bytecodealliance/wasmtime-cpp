@@ -88,19 +88,19 @@ jobs:
       if: matrix.gcc
 
     # Configure CMake appropriately
-    - run: cmake -B build ${{ matrix.args }} -G Ninja
+    - run: cmake -B build ${{ matrix.args }}
       if: matrix.os == 'windows-latest'
 
-    - run: cmake -B build ${{ matrix.args }} -DCMAKE_BUILD_TYPE=${{ matrix.config }} -G Ninja
+    - run: cmake -B build ${{ matrix.args }} -DCMAKE_BUILD_TYPE=${{ matrix.config }}
       if: matrix.os == 'ubuntu-latest'
 
     - run: echo /usr/local/opt/llvm/bin >> $GITHUB_PATH
       if: matrix.os == 'macos-latest'
-    - run: cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.config }} ${{ matrix.args }} -G Ninja
+    - run: cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.config }} ${{ matrix.args }}
       if: matrix.os == 'macos-latest'
 
-    - run: cmake --build build --config ${{ matrix.config }} --verbose
-    - run: ctest -C ${{ matrix.config }}
+    - run: cmake --build build --config ${{ matrix.config }} --verbose --parallel 4
+    - run: ctest -C ${{ matrix.config }} --parallel 4
       working-directory: build
       env:
         CTEST_OUTPUT_ON_FAILURE: 1
