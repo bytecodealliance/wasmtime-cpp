@@ -18,10 +18,8 @@ endif()
 
 function(configure_wasmtime_target name)
   if (MSVC)
-    target_compile_options(${name} PUBLIC /W4 /WX /DWASM_API_EXTERN= /DWASI_API_EXTERN=)
+    target_compile_options(${name} PUBLIC /DWASM_API_EXTERN= /DWASI_API_EXTERN=)
     target_link_libraries(${name} ws2_32 bcrypt advapi32 userenv ntdll shell32 ole32)
-  else()
-    target_compile_options(${name} PUBLIC -Wall -Wextra -pedantic -Werror -Wno-unused-command-line-argument)
   endif()
 
   target_link_libraries(${name} wasmtime)

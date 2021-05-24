@@ -3,6 +3,12 @@ function(add_example name)
   configure_wasmtime_target(${name})
   add_test(NAME example-${name} COMMAND ${name}
     WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+
+  if (MSVC)
+    target_compile_options(${name} PUBLIC /W4 /WX)
+  else()
+    target_compile_options(${name} PUBLIC -Wall -Wextra -pedantic -Werror -Wno-unused-command-line-argument)
+  endif()
 endfunction()
 
 add_example(fuel)
