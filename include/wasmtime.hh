@@ -1009,7 +1009,7 @@ public:
   void env(const std::vector<std::pair<std::string, std::string>> &env) {
     std::vector<const char *> names;
     std::vector<const char *> values;
-    for (auto [name, value] : env) {
+    for (const auto &[name, value] : env) {
       names.push_back(name.c_str());
       values.push_back(value.c_str());
     }
