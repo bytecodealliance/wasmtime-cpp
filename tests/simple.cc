@@ -166,7 +166,7 @@ TEST(Val, Smoke) {
   EXPECT_EQ(val.kind(), KindExternRef);
   EXPECT_EQ(std::any_cast<int>(val.externref()->data()), 5);
 
-  val = std::optional<Func*>(std::nullopt);
+  val = std::optional<Func>(std::nullopt);
   EXPECT_EQ(val.kind(), KindFuncRef);
   EXPECT_EQ(val.funcref(), std::nullopt);
 
@@ -176,9 +176,9 @@ TEST(Val, Smoke) {
     return std::monostate();
   });
 
-  val = std::optional<Func*>(&func);
+  val = std::optional<Func>(func);
   EXPECT_EQ(val.kind(), KindFuncRef);
 
-  val = &func;
+  val = func;
   EXPECT_EQ(val.kind(), KindFuncRef);
 }
