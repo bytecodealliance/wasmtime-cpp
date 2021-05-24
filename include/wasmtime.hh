@@ -1486,7 +1486,8 @@ public:
 };
 
 Val::Val(std::optional<Func *> func)
-    : val({.kind = WASMTIME_FUNCREF, .of = {.funcref = {.store_id = 0}}}) {
+    : val({.kind = WASMTIME_FUNCREF,
+           .of = {.funcref = {.store_id = 0, .index = 0}}}) {
   if (func) {
     val.of.funcref = (**func).func;
   }
