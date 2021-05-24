@@ -844,7 +844,7 @@ public:
   std::string message() const {
     wasm_byte_vec_t msg;
     wasm_trap_message(ptr.get(), &msg);
-    std::string ret(msg.data, msg.size);
+    std::string ret(msg.data, msg.size - 1);
     wasm_byte_vec_delete(&msg);
     return ret;
   }
@@ -1019,25 +1019,26 @@ public:
 
   void inherit_env() { wasi_config_inherit_env(ptr.get()); }
 
-  bool stdin_file(std::string &path) {
+  [[nodiscard]] bool stdin_file(const std::string &path) {
     return wasi_config_set_stdin_file(ptr.get(), path.c_str());
   }
 
   void inherit_stdin() { return wasi_config_inherit_stdin(ptr.get()); }
 
-  bool stdout_file(std::string &path) {
+  [[nodiscard]] bool stdout_file(const std::string &path) {
     return wasi_config_set_stdout_file(ptr.get(), path.c_str());
   }
 
   void inherit_stdout() { return wasi_config_inherit_stdout(ptr.get()); }
 
-  bool stderr_file(std::string &path) {
+  [[nodiscard]] bool stderr_file(const std::string &path) {
     return wasi_config_set_stderr_file(ptr.get(), path.c_str());
   }
 
   void inherit_stderr() { return wasi_config_inherit_stderr(ptr.get()); }
 
-  bool preopen_dir(std::string &path, std::string &guest_path) {
+  [[nodiscard]] bool preopen_dir(const std::string &path,
+                                 const std::string &guest_path) {
     return wasi_config_preopen_dir(ptr.get(), path.c_str(), guest_path.c_str());
   }
 };
@@ -1202,7 +1203,7 @@ public:
     return *this;
   }
 
-  ValKind Kind() const {
+  ValKind kind() const {
     switch (val.kind) {
     case WASMTIME_I32:
       return KindI32;
@@ -1267,7 +1268,7 @@ public:
     return std::nullopt;
   }
 
-  std::optional<Func> func() const;
+  std::optional<Func> funcref() const;
 };
 
 class Global {
@@ -1485,14 +1486,13 @@ public:
 };
 
 Val::Val(std::optional<Func *> func)
-    : val({.kind = WASMTIME_FUNCREF, .of = {.i32 = 0}}) {
-  if (!func) {
-    return;
+    : val({.kind = WASMTIME_FUNCREF, .of = {.funcref = {.store_id = 0}}}) {
+  if (func) {
+    val.of.funcref = (**func).func;
   }
-  val.of.funcref = (**func).func;
 }
 
-std::optional<Func> Val::func() const {
+std::optional<Func> Val::funcref() const {
   if (val.kind != WASMTIME_FUNCREF) {
     std::abort();
   }
