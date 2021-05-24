@@ -9,6 +9,14 @@ function(add_example name)
   else()
     target_compile_options(${name} PUBLIC -Wall -Wextra -pedantic -Werror -Wno-unused-command-line-argument)
   endif()
+
+  if(ENABLE_CODE_ANALYSIS)
+    if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+      set_target_properties(${name} PROPERTIES
+        CXX_CLANG_TIDY
+        "clang-tidy;-checks=-*,readability-*,bugprone-*,-bugprone-exception-escape,clang-analyzer-*,cppcoreguidelines-*,portability-*,performance-*;-header-filter=wasmtime.hh;-warnings-as-errors=*")
+    endif()
+  endif()
 endfunction()
 
 add_example(fuel)

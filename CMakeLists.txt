@@ -7,15 +7,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 option(ENABLE_CODE_ANALYSIS "Run code analysis" OFF)
 message(STATUS "ENABLE_CODE_ANALYSIS       ${ENABLE_CODE_ANALYSIS}")
 
-if(ENABLE_CODE_ANALYSIS)
-  if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    set(CMAKE_CXX_CLANG_TIDY clang-tidy
-        -checks=-*,readability-*,bugprone-*,-bugprone-exception-escape,clang-analyzer-*,cppcoreguidelines-*,portability-*,performance-*
-        -header-filter=wasmtime.hh
-        -warnings-as-errors=*)
-  endif()
-endif()
-
 function(configure_wasmtime_target name)
   if (MSVC)
     target_compile_options(${name} PUBLIC /DWASM_API_EXTERN= /DWASI_API_EXTERN=)
@@ -31,7 +22,6 @@ function(configure_wasmtime_target name)
       ${PROJECT_SOURCE_DIR}/c-api/include)
   target_link_directories(${name} PUBLIC ${PROJECT_SOURCE_DIR}/c-api/lib)
 endfunction()
-
 
 enable_testing()
 add_subdirectory(examples)
