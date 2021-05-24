@@ -150,6 +150,9 @@ TEST(Val, Smoke) {
   wasmtime_v128 v128 = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
   val = v128;
   EXPECT_EQ(val.kind(), KindV128);
+  for (int i = 0; i < 16; i++) {
+    EXPECT_EQ(val.v128()[i], i);
+  }
 
   val = std::optional<ExternRef>(std::nullopt);
   EXPECT_EQ(val.kind(), KindExternRef);
