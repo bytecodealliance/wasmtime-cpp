@@ -88,15 +88,15 @@ jobs:
       if: matrix.gcc
 
     # Configure CMake appropriately
-    - run: cmake -B build ${{ matrix.args }}
+    - run: cmake -B build ${{ matrix.args }} -G Ninja
       if: matrix.os == 'windows-latest'
 
-    - run: cmake -B build ${{ matrix.args }} -DCMAKE_BUILD_TYPE=${{ matrix.config }}
+    - run: cmake -B build ${{ matrix.args }} -DCMAKE_BUILD_TYPE=${{ matrix.config }} -G Ninja
       if: matrix.os == 'ubuntu-latest'
 
     - run: echo /usr/local/opt/llvm/bin >> $GITHUB_PATH
       if: matrix.os == 'macos-latest'
-    - run: cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.config }} ${{ matrix.args }}
+    - run: cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.config }} ${{ matrix.args }} -G Ninja
       if: matrix.os == 'macos-latest'
 
     - run: cmake --build build --config ${{ matrix.config }} --verbose
