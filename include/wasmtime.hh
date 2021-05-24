@@ -1174,8 +1174,6 @@ public:
       : val({.kind = WASMTIME_EXTERNREF, .of = {.externref = nullptr}}) {
     if (ptr) {
       val.of.externref = ptr->ptr.release();
-    } else {
-      val.of.externref = nullptr;
     }
   }
   Val(ExternRef ptr);
