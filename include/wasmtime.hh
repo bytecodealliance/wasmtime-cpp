@@ -1039,6 +1039,8 @@ public:
   }
 };
 
+class Caller;
+
 class Store {
   struct deleter {
     void operator()(wasmtime_store_t *p) const { wasmtime_store_delete(p); }
@@ -1063,7 +1065,9 @@ public:
 
   public:
     Context(Store &store) : Context(wasmtime_store_context(store.ptr.get())) {}
-    Context(Store *store) : Context(wasmtime_store_context(store->ptr.get())) {}
+    Context(Store *store) : Context(*store) {}
+    Context(Caller &store);
+    Context(Caller *store);
 
     void gc() { wasmtime_context_gc(ptr); }
 
@@ -1381,23 +1385,53 @@ public:
   }
 };
 
+class Caller {
+  friend class Func;
+  friend class Store;
+  wasmtime_caller_t *ptr;
+  Caller(wasmtime_caller_t *ptr) : ptr(ptr) {}
+
+public:
+  Store::Context context() { return this; }
+};
+
+Store::Context::Context(Caller &caller)
+    : Context(wasmtime_caller_context(caller.ptr)) {}
+Store::Context::Context(Caller *caller) : Context(*caller) {}
+
 class Func {
   friend class Val;
   friend class Instance;
 
   wasmtime_func_t func;
 
+  template <typename F>
+  static wasm_trap_t *raw_callback(void *env, wasmtime_caller_t *caller,
+                                   const wasmtime_val_t *args, size_t nargs,
+                                   wasmtime_val_t *results, size_t nresults) {
+    F *func = reinterpret_cast<F *>(env);
+    std::span<const Val> args_span(reinterpret_cast<const Val *>(args), // NOLINT
+                                   nargs);
+    std::span<Val> results_span(reinterpret_cast<Val *>(results), // NOLINT
+                                nresults);
+    Result<std::monostate> result =
+        (*func)(Caller(caller), args_span, results_span);
+    return nullptr;
+  }
+
+  template <typename F> static void raw_finalize(void *env) {
+    std::unique_ptr<F> ptr;
+    ptr.reset(reinterpret_cast<F *>(env));
+  }
+
 public:
   Func(wasmtime_func_t func) : func(func) {}
 
-  // TODO
-  /* static Result<Func> create(Store::Context cx, const FuncType &ty) { */
-  /*   wasmtime_func_t func; */
-  /*   auto *error = wasmtime_func_new(cx.ptr, ty.ptr.get(), &func); */
-  /*   if (error != nullptr) */
-  /*     return Error(error); */
-  /*   return Func(func); */
-  /* } */
+  template <typename F>
+  Func(Store::Context cx, const FuncType &ty, F f) : func({}) {
+    wasmtime_func_new(cx.ptr, ty.ptr.get(), raw_callback<F>,
+                      std::make_unique<F>(f).release(), raw_finalize<F>, &func);
+  }
 
   [[nodiscard]] TrapResult<std::vector<Val>>
   call(Store::Context cx, const std::vector<Val> &params) {
@@ -1479,7 +1513,7 @@ class Instance {
     std::abort();
   }
 
-  static void cvt(Extern &e, wasmtime_extern_t &raw) {
+  static void cvt(const Extern &e, wasmtime_extern_t &raw) {
     if (auto *func = std::get_if<Func>(&e)) {
       raw.kind = WASMTIME_EXTERN_FUNC;
       raw.of.func = func->func;
@@ -1510,9 +1544,9 @@ public:
   create(Store::Context cx, const Module &m,
          const std::vector<Extern> &imports) {
     std::vector<wasmtime_extern_t> raw_imports;
-    for (auto item : imports) {
+    for (auto &item : imports) {
       raw_imports.push_back(wasmtime_extern_t{});
-      auto last = raw_imports.back();
+      auto &last = raw_imports.back();
       Instance::cvt(item, last);
     }
     wasmtime_instance_t instance;
