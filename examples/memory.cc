@@ -1,3 +1,5 @@
+#undef NDEBUG
+
 #include <fstream>
 #include <iostream>
 #include <sstream>
