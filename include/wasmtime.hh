@@ -1187,8 +1187,17 @@ public:
     }
   }
 
-  Val &operator=(const Val &other) = delete;
-  Val &operator=(Val &&other) = delete;
+  Val &operator=(const Val &other) noexcept {
+    if (val.kind == WASMTIME_EXTERNREF && val.of.externref != nullptr) {
+      wasmtime_externref_delete(val.of.externref);
+    }
+    wasmtime_val_copy(&val, &other.val);
+    return *this;
+  }
+  Val &operator=(Val &&other) noexcept {
+    std::swap(val, other.val);
+    return *this;
+  }
 
   ValKind Kind() const {
     switch (val.kind) {
