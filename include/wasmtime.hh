@@ -1066,8 +1066,8 @@ public:
   public:
     Context(Store &store) : Context(wasmtime_store_context(store.ptr.get())) {}
     Context(Store *store) : Context(*store) {}
-    Context(Caller &store);
-    Context(Caller *store);
+    Context(Caller &caller);
+    Context(Caller *caller);
 
     void gc() { wasmtime_context_gc(ptr); }
 
@@ -1409,7 +1409,7 @@ class Func {
   static wasm_trap_t *raw_callback(void *env, wasmtime_caller_t *caller,
                                    const wasmtime_val_t *args, size_t nargs,
                                    wasmtime_val_t *results, size_t nresults) {
-    F *func = reinterpret_cast<F *>(env);
+    F *func = reinterpret_cast<F *>(env); // NOLINT
     std::span<const Val> args_span(reinterpret_cast<const Val *>(args), // NOLINT
                                    nargs);
     std::span<Val> results_span(reinterpret_cast<Val *>(results), // NOLINT
@@ -1421,7 +1421,7 @@ class Func {
 
   template <typename F> static void raw_finalize(void *env) {
     std::unique_ptr<F> ptr;
-    ptr.reset(reinterpret_cast<F *>(env));
+    ptr.reset(reinterpret_cast<F *>(env)); // NOLINT
   }
 
 public:
@@ -1514,22 +1514,22 @@ class Instance {
   }
 
   static void cvt(const Extern &e, wasmtime_extern_t &raw) {
-    if (auto *func = std::get_if<Func>(&e)) {
+    if (const auto *func = std::get_if<Func>(&e)) {
       raw.kind = WASMTIME_EXTERN_FUNC;
       raw.of.func = func->func;
-    } else if (auto *global = std::get_if<Global>(&e)) {
+    } else if (const auto *global = std::get_if<Global>(&e)) {
       raw.kind = WASMTIME_EXTERN_GLOBAL;
       raw.of.global = global->global;
-    } else if (auto *table = std::get_if<Table>(&e)) {
+    } else if (const auto *table = std::get_if<Table>(&e)) {
       raw.kind = WASMTIME_EXTERN_TABLE;
       raw.of.table = table->table;
-    } else if (auto *memory = std::get_if<Memory>(&e)) {
+    } else if (const auto *memory = std::get_if<Memory>(&e)) {
       raw.kind = WASMTIME_EXTERN_MEMORY;
       raw.of.memory = memory->memory;
-    } else if (auto *instance = std::get_if<Instance>(&e)) {
+    } else if (const auto *instance = std::get_if<Instance>(&e)) {
       raw.kind = WASMTIME_EXTERN_INSTANCE;
       raw.of.instance = instance->instance;
-    } else if (auto *module = std::get_if<Module>(&e)) {
+    } else if (const auto *module = std::get_if<Module>(&e)) {
       raw.kind = WASMTIME_EXTERN_MODULE;
       raw.of.module = module->ptr.get();
     } else {
@@ -1544,7 +1544,7 @@ public:
   create(Store::Context cx, const Module &m,
          const std::vector<Extern> &imports) {
     std::vector<wasmtime_extern_t> raw_imports;
-    for (auto &item : imports) {
+    for (const auto &item : imports) {
       raw_imports.push_back(wasmtime_extern_t{});
       auto &last = raw_imports.back();
       Instance::cvt(item, last);
