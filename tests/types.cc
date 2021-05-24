@@ -38,6 +38,7 @@ TEST(ValType, Smoke) {
   ValType t3(t2);
 
   ValType t4(**t);
+  ValType::Ref r(t4);
 }
 
 TEST(MemoryType, Smoke) {
@@ -45,6 +46,8 @@ TEST(MemoryType, Smoke) {
 
   EXPECT_EQ(t->limits().min(), 1);
   EXPECT_EQ(t->limits().max(), std::nullopt);
+  MemoryType t2 = t;
+  t2 = t;
 }
 
 TEST(TableType, Smoke) {
@@ -53,6 +56,9 @@ TEST(TableType, Smoke) {
   EXPECT_EQ(t->limits().min(), 1);
   EXPECT_EQ(t->limits().max(), std::nullopt);
   EXPECT_EQ(t->element().kind(), KindFuncRef);
+
+  TableType t2 = t;
+  t2 = t;
 }
 
 TEST(GlobalType, Smoke) {
@@ -60,12 +66,18 @@ TEST(GlobalType, Smoke) {
 
   EXPECT_EQ(t->content().kind(), KindFuncRef);
   EXPECT_TRUE(t->is_mutable());
+
+  GlobalType t2 = t;
+  t2 = t;
 }
 
 TEST(FuncType, Smoke) {
   FuncType t({}, {});
   EXPECT_EQ(t->params().size(), 0);
   EXPECT_EQ(t->results().size(), 0);
+
+  auto other = t;
+  other = t;
 
   FuncType t2({KindI32}, {KindI64});
   EXPECT_EQ(t2->params().size(), 1);
@@ -102,6 +114,8 @@ TEST(ModuleType, Smoke) {
   EXPECT_EQ(import_ty.params().size(), 0);
   EXPECT_EQ(import_ty.results().size(), 0);
 
+  for (auto &imp : imports) {}
+
   auto exports = ty->exports();
   EXPECT_EQ(exports.size(), 1);
   auto e = *exports.begin();
@@ -109,6 +123,16 @@ TEST(ModuleType, Smoke) {
   auto export_ty = std::get<GlobalType::Ref>(ExternType::from_export(e));
   EXPECT_EQ(export_ty.content().kind(), KindI32);
   EXPECT_FALSE(export_ty.is_mutable());
+
+  for (auto &exp : exports) {}
+
+  auto other_imports = ty->imports();
+  other_imports = std::move(imports);
+  ImportType::List last_imports(std::move(other_imports));
+
+  auto other_exports = ty->exports();
+  other_exports = std::move(exports);
+  ExportType::List last_exports(std::move(other_exports));
 }
 
 TEST(InstanceType, Smoke) {

@@ -49,6 +49,7 @@ TEST(Config, Smoke) {
   unwrap(config.profiler(Config::ProfileNone));
   config.static_memory_maximum_size(0);
   config.static_memory_guard_size(0);
+  config.dynamic_memory_guard_size(0);
   auto result = config.cache_load_default();
   config.cache_load("nonexistent").err();
 
@@ -81,6 +82,10 @@ TEST(Trap, Smoke) {
   EXPECT_EQ(frame.func_index(), 0);
   EXPECT_EQ(frame.func_offset(), 1);
   EXPECT_EQ(frame.module_offset(), 29);
+  for (auto &frame : trace) {}
+
+  EXPECT_TRUE(func.call(store, {}).err().message().find("unreachable") != std::string::npos);
+  EXPECT_EQ(func.call(store, {1}).err().message(), "expected 0 arguments, got 1");
 }
 
 TEST(Module, Smoke) {
@@ -95,6 +100,13 @@ TEST(Module, Smoke) {
 
   Module::validate(engine, wasm).ok();
   Module::validate(engine, emptyWasm).err();
+
+  Module m2 = unwrap(Module::compile(engine, "(module)"));
+  Module m3 = m2;
+  Module m4(m3);
+  m4 = m2;
+  Module m5(std::move(m3));
+  m4 = std::move(m5);
 }
 
 TEST(Module, Serialize) {
@@ -124,6 +136,7 @@ TEST(ExternRef, Smoke) {
   ExternRef b(3);
   EXPECT_STREQ(std::any_cast<const char*>(a.data()), "foo");
   EXPECT_EQ(std::any_cast<int>(b.data()), 3);
+  a = b;
 }
 
 TEST(Val, Smoke) {
@@ -181,4 +194,7 @@ TEST(Val, Smoke) {
 
   val = func;
   EXPECT_EQ(val.kind(), KindFuncRef);
+
+  Val other(1);
+  val = other;
 }
