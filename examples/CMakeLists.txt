@@ -12,3 +12,8 @@ add_example(externref)
 add_example(gcd)
 add_example(memory)
 add_example(hello)
+
+# These targets give warnings about constants and such we don't really care
+# about or want to fix.
+set_target_properties(memory PROPERTIES CXX_CLANG_TIDY "")
+set_target_properties(gcd PROPERTIES CXX_CLANG_TIDY "")
