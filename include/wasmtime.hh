@@ -1164,8 +1164,8 @@ public:
   Val(int64_t i64) : val({.kind = WASMTIME_I64, .of = {.i64 = i64}}) {}
   Val(float f32) : val({.kind = WASMTIME_F32, .of = {.f32 = f32}}) {}
   Val(double f64) : val({.kind = WASMTIME_F64, .of = {.f64 = f64}}) {}
-  Val(wasmtime_v128 v128) : val({.kind = WASMTIME_V128, .of = {.i32 = 0}}) {
-    memcpy(&val.of.v128[0], v128, sizeof(wasmtime_v128));
+  Val(const wasmtime_v128 &v128) : val({.kind = WASMTIME_V128, .of = {.i32 = 0}}) {
+    memcpy(&val.of.v128[0], &v128[0], sizeof(wasmtime_v128));
   }
   Val(std::optional<Func *> func);
   Val(Func *func) : Val(std::optional(func)) {}
