@@ -1181,7 +1181,11 @@ public:
     std::swap(val, other.val);
   }
 
-  ~Val() { wasmtime_val_delete(&val); }
+  ~Val() {
+    if (val.kind == WASMTIME_EXTERNREF && val.of.externref != nullptr) {
+      wasmtime_externref_delete(val.of.externref);
+    }
+  }
 
   Val &operator=(const Val &other) = delete;
   Val &operator=(Val &&other) = delete;
