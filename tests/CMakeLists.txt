@@ -16,6 +16,9 @@ function(add_test name)
   configure_wasmtime_target(test-${name})
 
   gtest_discover_tests(test-${name})
+
+  # gtest won't pass clang-tidy
+  set_target_properties(test-${name} PROPERTIES CXX_CLANG_TIDY "")
 endfunction()
 
 add_test(simple)

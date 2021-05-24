@@ -43,7 +43,7 @@ TEST(Config, Smoke) {
   unwrap(config.profiler(Config::ProfileNone));
   config.static_memory_maximum_size(0);
   config.static_memory_guard_size(0);
-  std::move(config.cache_load_default());
+  auto result = config.cache_load_default();
   config.cache_load("nonexistent").err();
 
   Config config2 = std::move(config);
