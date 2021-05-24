@@ -166,7 +166,7 @@ public:
     return std::monostate();
   }
 
-  [[nodiscard]] Result<std::monostate> cache_load(std::string &path) {
+  [[nodiscard]] Result<std::monostate> cache_load(const std::string &path) {
     auto *error = wasmtime_config_cache_config_load(ptr.get(), path.c_str());
     if (error != nullptr) {
       return Error(error);
@@ -292,6 +292,8 @@ public:
         return KindExternRef;
       case WASM_FUNCREF:
         return KindFuncRef;
+      case WASMTIME_V128:
+        return KindV128;
       }
       std::abort();
     }
@@ -335,6 +337,7 @@ public:
   static ValType f64() { return ValType(KindF64); }
   static ValType externref() { return ValType(KindExternRef); }
   static ValType funcref() { return ValType(KindFuncRef); }
+  static ValType v128() { return ValType(KindV128); }
 
   Ref *operator->() { return &ref; }
   Ref *operator*() { return &ref; }

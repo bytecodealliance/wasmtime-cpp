@@ -37,7 +37,4 @@ endfunction()
 
 enable_testing()
 add_subdirectory(examples)
-
-add_executable(test-all tests/all.cc)
-add_test(NAME smoke COMMAND test-all)
-configure_wasmtime_target(test-all)
+add_subdirectory(tests)
