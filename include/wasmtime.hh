@@ -1410,8 +1410,9 @@ class Func {
                                    const wasmtime_val_t *args, size_t nargs,
                                    wasmtime_val_t *results, size_t nresults) {
     F *func = reinterpret_cast<F *>(env); // NOLINT
-    std::span<const Val> args_span(reinterpret_cast<const Val *>(args), // NOLINT
-                                   nargs);
+    std::span<const Val> args_span(
+        reinterpret_cast<const Val *>(args), // NOLINT
+        nargs);
     std::span<Val> results_span(reinterpret_cast<Val *>(results), // NOLINT
                                 nresults);
     Result<std::monostate> result =
