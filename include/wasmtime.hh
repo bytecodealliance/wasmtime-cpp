@@ -1627,7 +1627,7 @@ public:
   }
 
   [[nodiscard]] Result<std::monostate>
-  define(std::string_view module, std::string_view name, Extern &item) {
+  define(std::string_view module, std::string_view name, const Extern &item) {
     wasmtime_extern_t raw;
     Instance::cvt(item, raw);
     auto *error =

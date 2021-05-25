@@ -198,3 +198,108 @@ TEST(Val, Smoke) {
   Val other(1);
   val = other;
 }
+
+TEST(Global, Smoke) {
+  Engine engine;
+  Store store(engine);
+  Global::create(store, GlobalType(KindI32, true), 3.0).err();
+  unwrap(Global::create(store, GlobalType(KindI32, true), 3));
+  unwrap(Global::create(store, GlobalType(KindI32, false), 3));
+
+  Global g = unwrap(Global::create(store, GlobalType(KindI32, true), 4));
+  EXPECT_EQ(g.get(store).i32(), 4);
+  unwrap(g.set(store, 10));
+  EXPECT_EQ(g.get(store).i32(), 10);
+  g.set(store, 10.23).err();
+  EXPECT_EQ(g.get(store).i32(), 10);
+
+  EXPECT_EQ(g.type(store)->content().kind(), KindI32);
+  EXPECT_TRUE(g.type(store)->is_mutable());
+}
+
+TEST(Table, Smoke) {
+  Engine engine;
+  Store store(engine);
+  Table::create(store, TableType(KindI32, Limits(1)), 3.0).err();
+
+  Val null = std::optional<Func>();
+  Table t = unwrap(Table::create(store, TableType(KindFuncRef, Limits(1)), null));
+  EXPECT_FALSE(t.get(store, 1));
+  EXPECT_TRUE(t.get(store, 0));
+  Val val = *t.get(store, 0);
+  EXPECT_EQ(val.kind(), KindFuncRef);
+  EXPECT_FALSE(val.funcref());
+  EXPECT_EQ(unwrap(t.grow(store, 4, null)), 1);
+  unwrap(t.set(store, 3, null));
+  t.set(store, 3, 3).err();
+  EXPECT_EQ(t.size(store), 5);
+  EXPECT_EQ(t.type(store)->element().kind(), KindFuncRef);
+}
+
+TEST(Memory, Smoke) {
+  Engine engine;
+  Store store(engine);
+  Memory m = unwrap(Memory::create(store, MemoryType(Limits(1))));
+  EXPECT_EQ(m.size(store), 1);
+  EXPECT_EQ(unwrap(m.grow(store, 1)), 1);
+  EXPECT_EQ(m.data(store).size(), 2 << 16);
+  EXPECT_EQ(m.type(store)->limits().min(), 1);
+}
+
+TEST(Instance, Smoke) {
+  Engine engine;
+  Store store(engine);
+  Memory m = unwrap(Memory::create(store, MemoryType(Limits(1))));
+  Global g = unwrap(Global::create(store, GlobalType(KindI32, false), 1));
+  Table t = unwrap(Table::create(store, TableType(KindFuncRef, Limits(1)), std::optional<Func>()));
+  Func f(store, FuncType({}, {}), [](auto caller, auto params, auto results) -> auto {
+    return std::monostate();
+  });
+
+  Module mod = unwrap(Module::compile(engine,
+    "(module"
+      "(import \"\" \"\" (func))"
+      "(import \"\" \"\" (global i32))"
+      "(import \"\" \"\" (table 1 funcref))"
+      "(import \"\" \"\" (memory 1))"
+
+      "(func (export \"f\"))"
+      "(global (export \"g\") i32 (i32.const 0))"
+      "(export \"m\" (memory 0))"
+      "(export \"t\" (table 0))"
+    ")"
+  ));
+  Instance::create(store, mod, {}).err();
+  Instance i = unwrap(Instance::create(store, mod, {f, g, t, m}));
+  EXPECT_FALSE(i.get(store, "not-present"));
+  f = std::get<Func>(*i.get(store, "f"));
+  m = std::get<Memory>(*i.get(store, "m"));
+  t = std::get<Table>(*i.get(store, "t"));
+  g = std::get<Global>(*i.get(store, "g"));
+
+  EXPECT_TRUE(i.get(store, 0));
+  EXPECT_TRUE(i.get(store, 1));
+  EXPECT_TRUE(i.get(store, 2));
+  EXPECT_TRUE(i.get(store, 3));
+  EXPECT_FALSE(i.get(store, 4));
+  auto [name, func] = *i.get(store, 0);
+  EXPECT_EQ(name, "f");
+}
+
+TEST(Linker, Smoke) {
+  Engine engine;
+  Linker linker(engine);
+  Store store(engine);
+  linker.allow_shadowing(false);
+  Global g = unwrap(Global::create(store, GlobalType(KindI32, false), 1));
+  unwrap(linker.define("a", "g", g));
+  unwrap(linker.define_wasi());
+
+  Module mod = unwrap(Module::compile(engine, "(module)"));
+  Instance i = unwrap(Instance::create(store, mod, {}));
+  unwrap(linker.define_instance(store, "x", i));
+  unwrap(linker.instantiate(store, mod));
+  unwrap(linker.module(store, "y", mod));
+  EXPECT_TRUE(linker.get(store, "a", "g"));
+  unwrap(linker.get_default(store, "g"));
+}
