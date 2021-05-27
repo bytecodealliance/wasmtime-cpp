@@ -938,6 +938,9 @@ public:
   };
 };
 
+/**
+ * \brief Type information about a WebAssembly module.
+ */
 class ModuleType {
   friend class Module;
 
@@ -950,21 +953,27 @@ class ModuleType {
   std::unique_ptr<wasmtime_moduletype_t, deleter> ptr;
 
 public:
+  /// Non-owning reference to a `ModuleType`, must not be used after the owner
+  /// has been deleted.
   class Ref {
     friend class ModuleType;
 
     const wasmtime_moduletype_t *ptr;
 
   public:
+    /// Creates a new reference from the raw underlying C API representation.
     Ref(const wasmtime_moduletype_t *ptr) : ptr(ptr) {}
+    /// Creates a reference to the given type.
     Ref(const ModuleType &ty) : Ref(ty.ptr.get()) {}
 
+    /// Returns the list of types imported by this module.
     ImportType::List imports() const {
       ImportType::List list;
       wasmtime_moduletype_imports(ptr, &list.list);
       return list;
     }
 
+    /// Returns the list of types exported by this module.
     ExportType::List exports() const {
       ExportType::List list;
       wasmtime_moduletype_exports(ptr, &list.list);
@@ -977,7 +986,11 @@ private:
   ModuleType(wasmtime_moduletype_t *ptr) : ptr(ptr), ref(ptr) {}
 
 public:
+  /// \brief Returns the underlying `Ref`, a non-owning reference pointing to
+  /// this instance.
   Ref *operator->() { return &ref; }
+  /// \brief Returns the underlying `Ref`, a non-owning reference pointing to
+  /// this instance.
   Ref *operator*() { return &ref; }
 };
 
