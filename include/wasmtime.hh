@@ -872,7 +872,9 @@ public:
 class ExportType {
 
 public:
-  /// Non-owning reference to an `ExportType`.
+  /// \brief Non-owning reference to an `ExportType`.
+  ///
+  /// Note to get type information you can use `ExternType::from_export`.
   class Ref {
     friend class ExternType;
 
@@ -883,11 +885,11 @@ public:
     /// Creates a new reference from the raw underlying C API representation.
     Ref(const wasm_exporttype_t *ptr) : ptr(ptr) {}
 
+    /// Returns the name of this export.
     std::string_view name() {
       const auto *name = wasm_exporttype_name(ptr);
       return std::string_view(name->data, name->size);
     }
-
   };
 
   /// An owned list of `ExportType` instances.
