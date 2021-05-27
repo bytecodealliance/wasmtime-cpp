@@ -23,8 +23,8 @@ jobs:
         path: html
     - uses: JamesIves/github-pages-deploy-action@4.1.3
       with:
-	branch: gh-pages
-	folder: html
+        branch: gh-pages
+        folder: html
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
   test:
