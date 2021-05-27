@@ -17,10 +17,11 @@ jobs:
     - run: curl -L https://doxygen.nl/files/doxygen-1.9.1.linux.bin.tar.gz | tar xzf -
     - run: echo "`pwd`/doxygen-1.9.1/bin" >> $GITHUB_PATH
     - run: doxygen doxygen.conf
-    - uses: actions/upload-artifact@v1
+    - run: tar czf html.tar.gz html
+    - uses: actions/upload-artifact@v2
       with:
         name: c-api
-        path: html
+        path: html.tar.gz
     - uses: JamesIves/github-pages-deploy-action@4.1.3
       with:
         branch: gh-pages
