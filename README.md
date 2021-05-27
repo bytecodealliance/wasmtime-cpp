@@ -12,6 +12,9 @@
     <a href="https://github.com/bytecodealliance/wasmtime-cpp/actions?query=workflow%3ACI">
       <img src="https://github.com/bytecodealliance/wasmtime-cpp/workflows/CI/badge.svg" alt="CI status"/>
     </a>
+    <a href="https://bytecodealliance.github.io/wasmtime-cpp/">
+      <img src="https://img.shields.io/badge/docs-main-green" alt="Documentation"/>
+    </a>
   </p>
 
 </div>

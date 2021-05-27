@@ -1,4 +1,22 @@
 /**
+ * \mainpage
+ *
+ * This project is a C++ API for
+ * [Wasmtime](https://github.com/bytecodealliance/wasmtime). Support for the
+ * C++ API is exclusively built on the [C API of
+ * Wasmtime](https://docs.wasmtime.dev/c-api/), so the C++ support for this is
+ * simply a single header file. To use this header file, though, it must be
+ * combined with the header and binary of Wasmtime's C API.
+ *
+ * Examples can be [found
+ * online](https://github.com/bytecodealliance/wasmtime-cpp/tree/main/examples)
+ * and otherwise be sure to check out the
+ * [README](https://github.com/bytecodealliance/wasmtime-cpp/blob/main/README.md)
+ * for simple usage instructions. Otherwise you can dive right in to the
+ * reference documentation of \ref wasmtime.hh
+ */
+
+/**
  * \file wasmtime.hh
  */
 
@@ -994,6 +1012,9 @@ public:
   Ref *operator*() { return &ref; }
 };
 
+/**
+ * \brief Type information about a WebAssembly instance.
+ */
 class InstanceType {
   friend class Instance;
 
@@ -1006,15 +1027,20 @@ class InstanceType {
   std::unique_ptr<wasmtime_instancetype_t, deleter> ptr;
 
 public:
+  /// Non-owning reference to an `InstanceType`, must not be used after the
+  /// original owner is deleted.
   class Ref {
     friend class InstanceType;
 
     const wasmtime_instancetype_t *ptr;
 
   public:
+    /// Creates a new reference from the raw underlying C API representation.
     Ref(const wasmtime_instancetype_t *ptr) : ptr(ptr) {}
+    /// Creates a new reference to the provided type.
     Ref(const InstanceType &ty) : Ref(ty.ptr.get()) {}
 
+    /// Returns the list of types exported by this instance.
     ExportType::List exports() const {
       ExportType::List list;
       wasmtime_instancetype_exports(ptr, &list.list);
@@ -1027,7 +1053,11 @@ private:
   InstanceType(wasmtime_instancetype_t *ptr) : ptr(ptr), ref(ptr) {}
 
 public:
+  /// \brief Returns the underlying `Ref`, a non-owning reference pointing to
+  /// this instance.
   Ref *operator->() { return &ref; }
+  /// \brief Returns the underlying `Ref`, a non-owning reference pointing to
+  /// this instance.
   Ref *operator*() { return &ref; }
 };
 
