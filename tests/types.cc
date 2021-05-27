@@ -23,13 +23,13 @@ TEST(Limits, Smoke) {
 }
 
 TEST(ValType, Smoke) {
-  EXPECT_EQ(ValType::i32()->kind(), KindI32);
-  EXPECT_EQ(ValType::i64()->kind(), KindI64);
-  EXPECT_EQ(ValType::f32()->kind(), KindF32);
-  EXPECT_EQ(ValType::f64()->kind(), KindF64);
-  EXPECT_EQ(ValType::externref()->kind(), KindExternRef);
-  EXPECT_EQ(ValType::funcref()->kind(), KindFuncRef);
-  EXPECT_EQ(ValType::v128()->kind(), KindV128);
+  EXPECT_EQ(ValType(KindI32)->kind(), KindI32);
+  EXPECT_EQ(ValType(KindI64)->kind(), KindI64);
+  EXPECT_EQ(ValType(KindF32)->kind(), KindF32);
+  EXPECT_EQ(ValType(KindF64)->kind(), KindF64);
+  EXPECT_EQ(ValType(KindV128)->kind(), KindV128);
+  EXPECT_EQ(ValType(KindFuncRef)->kind(), KindFuncRef);
+  EXPECT_EQ(ValType(KindExternRef)->kind(), KindExternRef);
 
   ValType t(KindI32);
   t = KindI64;

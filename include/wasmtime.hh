@@ -1,3 +1,7 @@
+/**
+ * \file wasmtime.hh
+ */
+
 #ifndef WASMTIME_HH
 #define WASMTIME_HH
 
@@ -14,10 +18,19 @@
 
 namespace wasmtime {
 
+/**
+ * \brief Errors coming from Wasmtime
+ *
+ * This class represents an error that came from Wasmtime and contains a textual
+ * description of the error that occurred.
+ */
 class Error {
   std::string msg;
 
 public:
+  /// \brief Creates an error from the raw C API representation
+  ///
+  /// Takes ownership of the provided `error`.
   Error(wasmtime_error_t *error) {
     wasm_byte_vec_t msg_bytes;
     wasmtime_error_message(error, &msg_bytes);
@@ -26,29 +39,56 @@ public:
     wasmtime_error_delete(error);
   }
 
+  /// \brief Returns the error message associated with this error.
   std::string_view message() const { return msg; }
 };
 
+/// \brief Used to print an error.
 std::ostream &operator<<(std::ostream &os, const Error &e) {
   os << e.message();
   return os;
 }
 
+/**
+ * \brief Fallible result type used for Wasmtime.
+ *
+ * This type is used as the return value of many methods in the Wasmtime API.
+ * This behaves similarly to Rust's `Result<T, E>` and will be replaced with a
+ * C++ standard when it exists.
+ */
 template <typename T, typename E = Error> class Result {
   std::variant<T, E> data;
 
 public:
+  /// \brief Creates a `Result` from its successful value.
   Result(T t) : data(std::move(t)) {}
+  /// \brief Creates a `Result` from an error value.
   Result(E e) : data(std::move(e)) {}
 
+  /// \brief Returns `true` if this result is a success, `false` if it's an
+  /// error
   operator bool() { return data.index() == 0; }
 
+  /// \brief Returns the error, if present, aborts if this is not an error.
   E &&err() { return std::get<E>(std::move(data)); }
+  /// \brief Returns the error, if present, aborts if this is not an error.
   const E &&err() const { return std::get<E>(std::move(data)); }
+
+  /// \brief Returns the success, if present, aborts if this is an error.
   T &&ok() { return std::get<T>(std::move(data)); }
+  /// \brief Returns the success, if present, aborts if this is an error.
   const T &&ok() const { return std::get<T>(std::move(data)); }
 };
 
+/**
+ * \brief Configuration for Wasmtime.
+ *
+ * This class is used to configure Wasmtime's compilation and various other
+ * settings such as enabled WebAssembly proposals.
+ *
+ * For more information be sure to consult the [rust
+ * documentation](https://docs.wasmtime.dev/api/wasmtime/struct.Config.html).
+ */
 class Config {
   friend class Engine;
 
@@ -59,54 +99,94 @@ class Config {
   std::unique_ptr<wasm_config_t, deleter> ptr;
 
 public:
+  /// \brief Creates configuration with all the default settings.
   Config() : ptr(wasm_config_new()) {}
 
+  /// \brief Configures whether dwarf debuginfo is emitted for assisting
+  /// in-process debugging.
+  ///
+  /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.debug_info
   void debug_info(bool enable) {
     wasmtime_config_debug_info_set(ptr.get(), enable);
   }
 
+  /// \brief Configures whether WebAssembly code can be interrupted.
+  ///
+  /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.interruptable
   void interruptable(bool enable) {
     wasmtime_config_interruptable_set(ptr.get(), enable);
   }
 
+  /// \brief Configures whether WebAssembly code will consume fuel and trap when
+  /// it runs out.
+  ///
+  /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.consume_fuel
   void consume_fuel(bool enable) {
     wasmtime_config_consume_fuel_set(ptr.get(), enable);
   }
 
+  /// \brief Configures the maximum amount of native stack wasm can consume.
+  ///
+  /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.max_wasm_stack
   void max_wasm_stack(size_t stack) {
     wasmtime_config_max_wasm_stack_set(ptr.get(), stack);
   }
 
+  /// \brief Configures whether the WebAssembly threads proposal is enabled
+  ///
+  /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.wasm_threads
   void wasm_threads(bool enable) {
     wasmtime_config_wasm_threads_set(ptr.get(), enable);
   }
 
+  /// \brief Configures whether the WebAssembly reference types proposal is enabled
+  ///
+  /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.wasm_reference_types
   void wasm_reference_types(bool enable) {
     wasmtime_config_wasm_reference_types_set(ptr.get(), enable);
   }
 
+  /// \brief Configures whether the WebAssembly simd proposal is enabled
+  ///
+  /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.wasm_simd
   void wasm_simd(bool enable) {
     wasmtime_config_wasm_simd_set(ptr.get(), enable);
   }
 
+  /// \brief Configures whether the WebAssembly bulk memory proposal is enabled
+  ///
+  /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.wasm_bulk_memory
   void wasm_bulk_memory(bool enable) {
     wasmtime_config_wasm_bulk_memory_set(ptr.get(), enable);
   }
 
+  /// \brief Configures whether the WebAssembly multi value proposal is enabled
+  ///
+  /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.wasm_multi_value
   void wasm_multi_value(bool enable) {
     wasmtime_config_wasm_multi_value_set(ptr.get(), enable);
   }
 
+  /// \brief Configures whether the WebAssembly module linking proposal is enabled
+  ///
+  /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.wasm_module_linking
   void wasm_module_linking(bool enable) {
     wasmtime_config_wasm_module_linking_set(ptr.get(), enable);
   }
 
+  /// \brief Strategies passed to `Config::strategy`
   enum Strategy {
+    /// Automatically selects the compilation strategy
     Auto = WASMTIME_STRATEGY_AUTO,
+    /// Requires Cranelift to be used for compilation
     Cranelift = WASMTIME_STRATEGY_CRANELIFT,
+    /// Uses lightbeam for compilation (not supported)
     Lightbeam = WASMTIME_STRATEGY_LIGHTBEAM,
   };
 
+  /// \brief Configures compilation strategy for wasm code.
+  ///
+  /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.strategy
   [[nodiscard]] Result<std::monostate> strategy(Strategy strategy) {
     auto *error =
         wasmtime_config_strategy_set(ptr.get(), (wasmtime_strategy_t)strategy);
@@ -116,27 +196,44 @@ public:
     return std::monostate();
   }
 
+  /// \brief Configures whether cranelift's debug verifier is enabled
+  ///
+  /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.cranelift_debug_verifier
   void cranelift_debug_verifier(bool enable) {
     wasmtime_config_cranelift_debug_verifier_set(ptr.get(), enable);
   }
 
+  /// \brief Values passed to `Config::cranelift_opt_level`
   enum OptLevel {
+    /// No extra optimizations performed
     OptNone = WASMTIME_OPT_LEVEL_NONE,
+    /// Optimize for speed
     OptSpeed = WASMTIME_OPT_LEVEL_SPEED,
+    /// Optimize for speed and generated code size
     OptSpeedAndSize = WASMTIME_OPT_LEVEL_SPEED_AND_SIZE,
   };
 
+  /// \brief Configures cranelift's optimization level
+  ///
+  /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.cranelift_opt_level
   void cranelift_opt_level(OptLevel level) {
     wasmtime_config_cranelift_opt_level_set(ptr.get(),
                                             (wasmtime_opt_level_t)level);
   }
 
+  /// \brief Values passed to `Config::profiler`
   enum ProfilingStrategy {
+    /// No profiling enabled
     ProfileNone = WASMTIME_PROFILING_STRATEGY_NONE,
+    /// Profiling hooks via perf's jitdump
     ProfileJitdump = WASMTIME_PROFILING_STRATEGY_JITDUMP,
+    /// Profiling hooks via VTune
     ProfileVtune = WASMTIME_PROFILING_STRATEGY_VTUNE,
   };
 
+  /// \brief Configures an active wasm profiler
+  ///
+  /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.profiler
   [[nodiscard]] Result<std::monostate> profiler(ProfilingStrategy profiler) {
     auto *error = wasmtime_config_profiler_set(
         ptr.get(), (wasmtime_profiling_strategy_t)profiler);
@@ -146,18 +243,30 @@ public:
     return std::monostate();
   }
 
+  /// \brief Configures the maximum size of memory to use a "static memory"
+  ///
+  /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.static_memory_maximum_size
   void static_memory_maximum_size(size_t size) {
     wasmtime_config_static_memory_maximum_size_set(ptr.get(), size);
   }
 
+  /// \brief Configures the size of static memory's guard region
+  ///
+  /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.static_memory_guard_size
   void static_memory_guard_size(size_t size) {
     wasmtime_config_static_memory_guard_size_set(ptr.get(), size);
   }
 
+  /// \brief Configures the size of dynamic memory's guard region
+  ///
+  /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.dynamic_memory_guard_size
   void dynamic_memory_guard_size(size_t size) {
     wasmtime_config_dynamic_memory_guard_size_set(ptr.get(), size);
   }
 
+  /// \brief Loads the default cache configuration present on the system.
+  ///
+  /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.cache_config_load_default
   [[nodiscard]] Result<std::monostate> cache_load_default() {
     auto *error = wasmtime_config_cache_config_load(ptr.get(), nullptr);
     if (error != nullptr) {
@@ -166,6 +275,9 @@ public:
     return std::monostate();
   }
 
+  /// \brief Loads cache configuration from the specified filename.
+  ///
+  /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.cache_config_load
   [[nodiscard]] Result<std::monostate> cache_load(const std::string &path) {
     auto *error = wasmtime_config_cache_config_load(ptr.get(), path.c_str());
     if (error != nullptr) {
@@ -175,6 +287,13 @@ public:
   }
 };
 
+/**
+ * \brief Global compilation state in Wasmtime.
+ *
+ * Created with either default configuration or with a specified instance of
+ * configuration, an `Engine` is used as an umbrella "session" for all other
+ * operations in Wasmtime.
+ */
 class Engine {
   friend class Store;
   friend class Module;
@@ -187,11 +306,24 @@ class Engine {
   std::unique_ptr<wasm_engine_t, deleter> ptr;
 
 public:
+  /// \brief Creates an engine with default compilation settings.
   Engine() : ptr(wasm_engine_new()) {}
+  /// \brief Creates an engine with the specified compilation settings.
   Engine(Config config)
       : ptr(wasm_engine_new_with_config(config.ptr.release())) {}
 };
 
+/**
+ * \brief Converts the WebAssembly text format into the WebAssembly binary
+ * format.
+ *
+ * This will parse the text format and attempt to translate it to the binary
+ * format. Note that the text parser assumes that all WebAssembly features are
+ * enabled and will parse syntax of future proposals. The exact syntax here
+ * parsed may be tweaked over time.
+ *
+ * Returns either an error if parsing failed or the wasm binary.
+ */
 [[nodiscard]] Result<std::vector<uint8_t>> wat2wasm(std::string_view wat) {
   wasm_byte_vec_t ret;
   auto *error = wasmtime_wat2wasm(wat.data(), wat.size(), &ret);
@@ -206,6 +338,9 @@ public:
   return vec;
 }
 
+/**
+ * \brief Min/max limits used for `MemoryType` and `TableType`
+ */
 class Limits {
   friend class MemoryType;
   friend class TableType;
@@ -213,12 +348,17 @@ class Limits {
   wasm_limits_t raw;
 
 public:
+  /// \brief Configures a minimum limit and no maximum limit.
   Limits(uint32_t min) : raw({.min = min, .max = wasm_limits_max_default}) {}
+  /// \brief Configures both a minimum and a maximum limit.
   Limits(uint32_t min, uint32_t max) : raw({.min = min, .max = max}) {}
+  /// \brief Creates limits from the raw underlying C API.
   Limits(const wasm_limits_t *limits) : raw(*limits) {}
 
+  /// \brief Returns the minimum size specified by these limits.
   uint32_t min() const { return raw.min; }
 
+  /// \brief Returns optional maximum limit configured.
   std::optional<uint32_t> max() const {
     if (raw.max == wasm_limits_max_default) {
       return std::nullopt;
@@ -227,16 +367,29 @@ public:
   }
 };
 
+/// Different kinds of types accepted by Wasmtime.
 enum ValKind {
+  /// WebAssembly's `i32` type
   KindI32,
+  /// WebAssembly's `i64` type
   KindI64,
+  /// WebAssembly's `f32` type
   KindF32,
+  /// WebAssembly's `f64` type
   KindF64,
+  /// WebAssembly's `v128` type from the simd proposal
   KindV128,
+  /// WebAssembly's `externref` type from the reference types
   KindExternRef,
+  /// WebAssembly's `funcref` type from the reference types
   KindFuncRef,
 };
 
+/**
+ * \brief Type information about a WebAssembly value.
+ *
+ * Currently mostly just contains the `ValKind`.
+ */
 class ValType {
   friend class TableType;
   friend class GlobalType;
@@ -269,15 +422,20 @@ class ValType {
   }
 
 public:
+  /// \brief Non-owning reference to a `ValType`, must not be used after the
+  /// original `ValType` is deleted.
   class Ref {
     friend class ValType;
 
     const wasm_valtype_t *ptr;
 
   public:
+    /// \brief Instantiates from the raw C API representation.
     Ref(const wasm_valtype_t *ptr) : ptr(ptr) {}
+    /// Copy constructor
     Ref(const ValType &ty) : Ref(ty.ptr.get()) {}
 
+    /// \brief Returns the corresponding "kind" for this type.
     ValKind kind() const {
       switch (wasm_valtype_kind(ptr)) {
       case WASM_I32:
@@ -299,19 +457,29 @@ public:
     }
   };
 
+  /// \brief Non-owning reference to a list of `ValType` instances. Must not be
+  /// used after the original owner is deleted.
   class ListRef {
     const wasm_valtype_vec_t *list;
 
   public:
+    /// Creates a list from the raw underlying C API.
     ListRef(const wasm_valtype_vec_t *list) : list(list) {}
 
+    /// This list iterates over a list of `ValType::Ref` instances.
     typedef const Ref *iterator;
+
+    /// Pointer to the beginning of iteration
     iterator begin() const {
       return reinterpret_cast<Ref *>(&list->data[0]); // NOLINT
     }
+
+    /// Pointer to the end of iteration
     iterator end() const {
       return reinterpret_cast<Ref *>(&list->data[list->size]); // NOLINT
     }
+
+    /// Returns how many types are in this list.
     size_t size() const { return list->size; }
   };
 
@@ -320,29 +488,34 @@ private:
   ValType(wasm_valtype_t *ptr) : ptr(ptr), ref(ptr) {}
 
 public:
+  /// Creates a new type from its kind.
   ValType(ValKind kind) : ValType(wasm_valtype_new(kind_to_c(kind))) {}
+  /// Copies a `Ref` to a new owned value.
   ValType(Ref other) : ValType(wasm_valtype_copy(other.ptr)) {}
+  /// Copies one type to a new one.
   ValType(const ValType &other) : ValType(wasm_valtype_copy(other.ptr.get())) {}
+  /// Copies the contents of another type into this one.
   ValType &operator=(const ValType &other) {
     ptr.reset(wasm_valtype_copy(other.ptr.get()));
     return *this;
   }
   ~ValType() = default;
+  /// Moves the memory owned by another value type into this one.
   ValType(ValType &&other) = default;
+  /// Moves the memory owned by another value type into this one.
   ValType &operator=(ValType &&other) = default;
 
-  static ValType i32() { return ValType(KindI32); }
-  static ValType i64() { return ValType(KindI64); }
-  static ValType f32() { return ValType(KindF32); }
-  static ValType f64() { return ValType(KindF64); }
-  static ValType externref() { return ValType(KindExternRef); }
-  static ValType funcref() { return ValType(KindFuncRef); }
-  static ValType v128() { return ValType(KindV128); }
-
+  /// \brief Returns the underlying `Ref`, a non-owning reference pointing to
+  /// this instance.
   Ref *operator->() { return &ref; }
+  /// \brief Returns the underlying `Ref`, a non-owning reference pointing to
+  /// this instance.
   Ref *operator*() { return &ref; }
 };
 
+/**
+ * \brief Type information about a WebAssembly linear memory
+ */
 class MemoryType {
   friend class Memory;
 
@@ -353,15 +526,21 @@ class MemoryType {
   std::unique_ptr<wasm_memorytype_t, deleter> ptr;
 
 public:
+  /// \brief Non-owning reference to a `MemoryType`, must not be used after the
+  /// original owner has been deleted.
   class Ref {
     friend class MemoryType;
 
     const wasm_memorytype_t *ptr;
 
   public:
+    /// Creates a refernece from the raw C API representation.
     Ref(const wasm_memorytype_t *ptr) : ptr(ptr) {}
+    /// Creates a reference from an original `MemoryType`.
     Ref(const MemoryType &ty) : Ref(ty.ptr.get()) {}
 
+    /// Returns the underlying limits on this wasm memory type, specified in
+    /// units of wasm pages.
     Limits limits() const { return Limits(wasm_memorytype_limits(ptr)); }
   };
 
@@ -370,22 +549,36 @@ private:
   MemoryType(wasm_memorytype_t *ptr) : ptr(ptr), ref(ptr) {}
 
 public:
-  MemoryType(Limits limits) : MemoryType(wasm_memorytype_new(&limits.raw)) {}
+  /// Creates a new wasm memory from the specified limits.
+  MemoryType(const Limits &limits) : MemoryType(wasm_memorytype_new(&limits.raw)) {}
+  /// Creates a new wasm memory type from the specified ref, making a fresh
+  //owned value.
   MemoryType(Ref other) : MemoryType(wasm_memorytype_copy(other.ptr)) {}
+  /// Copies the provided type into a new type.
   MemoryType(const MemoryType &other)
       : MemoryType(wasm_memorytype_copy(other.ptr.get())) {}
+  /// Copies the provided type into a new type.
   MemoryType &operator=(const MemoryType &other) {
     ptr.reset(wasm_memorytype_copy(other.ptr.get()));
     return *this;
   }
   ~MemoryType() = default;
+  /// Moves the type information from another type into this one.
   MemoryType(MemoryType &&other) = default;
+  /// Moves the type information from another type into this one.
   MemoryType &operator=(MemoryType &&other) = default;
 
+  /// \brief Returns the underlying `Ref`, a non-owning reference pointing to
+  /// this instance.
   Ref *operator->() { return &ref; }
+  /// \brief Returns the underlying `Ref`, a non-owning reference pointing to
+  /// this instance.
   Ref *operator*() { return &ref; }
 };
 
+/**
+ * \brief Type information about a WebAssembly table.
+ */
 class TableType {
   friend class Table;
 
@@ -396,17 +589,23 @@ class TableType {
   std::unique_ptr<wasm_tabletype_t, deleter> ptr;
 
 public:
+  /// Non-owning reference to a `TableType`, must not be used after the original
+  /// owner is deleted.
   class Ref {
     friend class TableType;
 
     const wasm_tabletype_t *ptr;
 
   public:
+    /// Creates a reference from the raw underlying C API representation.
     Ref(const wasm_tabletype_t *ptr) : ptr(ptr) {}
+    /// Creates a reference to the provided `TableType`.
     Ref(const TableType &ty) : Ref(ty.ptr.get()) {}
 
+    /// Returns the limits, in units of elements, of this table.
     Limits limits() const { return wasm_tabletype_limits(ptr); }
 
+    /// Returns the type of value that is stored in this table.
     ValType::Ref element() const { return wasm_tabletype_element(ptr); }
   };
 
@@ -415,23 +614,36 @@ private:
   TableType(wasm_tabletype_t *ptr) : ptr(ptr), ref(ptr) {}
 
 public:
+  /// Creates a new table type from the specified value type and limits.
   TableType(ValType ty, Limits limits)
       : TableType(wasm_tabletype_new(ty.ptr.release(), &limits.raw)) {}
+  /// Clones the given reference into a new table type.
   TableType(Ref other) : TableType(wasm_tabletype_copy(other.ptr)) {}
+  /// Copies another table type into this one.
   TableType(const TableType &other)
       : TableType(wasm_tabletype_copy(other.ptr.get())) {}
+  /// Copies another table type into this one.
   TableType &operator=(const TableType &other) {
     ptr.reset(wasm_tabletype_copy(other.ptr.get()));
     return *this;
   }
   ~TableType() = default;
+  /// Moves the table type resources from another type to this one.
   TableType(TableType &&other) = default;
+  /// Moves the table type resources from another type to this one.
   TableType &operator=(TableType &&other) = default;
 
+  /// \brief Returns the underlying `Ref`, a non-owning reference pointing to
+  /// this instance.
   Ref *operator->() { return &ref; }
+  /// \brief Returns the underlying `Ref`, a non-owning reference pointing to
+  /// this instance.
   Ref *operator*() { return &ref; }
 };
 
+/**
+ * \brief Type information about a WebAssembly global
+ */
 class GlobalType {
   friend class Global;
 
@@ -442,18 +654,24 @@ class GlobalType {
   std::unique_ptr<wasm_globaltype_t, deleter> ptr;
 
 public:
+  /// Non-owning reference to a `Global`, must not be used after the original
+  /// owner is deleted.
   class Ref {
     friend class GlobalType;
     const wasm_globaltype_t *ptr;
 
   public:
+    /// Creates a new reference from the raw underlying C API representation.
     Ref(const wasm_globaltype_t *ptr) : ptr(ptr) {}
+    /// Creates a new reference to the specified type.
     Ref(const GlobalType &ty) : Ref(ty.ptr.get()) {}
 
+    /// Returns whether or not this global type is mutable.
     bool is_mutable() const {
       return wasm_globaltype_mutability(ptr) == WASM_VAR;
     }
 
+    /// Returns the type of value stored within this global type.
     ValType::Ref content() const { return wasm_globaltype_content(ptr); }
   };
 
@@ -462,25 +680,38 @@ private:
   GlobalType(wasm_globaltype_t *ptr) : ptr(ptr), ref(ptr) {}
 
 public:
+  /// Creates a new global type from the specified value type and mutability.
   GlobalType(ValType ty, bool mut)
       : GlobalType(wasm_globaltype_new(
             ty.ptr.release(),
             (wasm_mutability_t)(mut ? WASM_VAR : WASM_CONST))) {}
+  /// Clones a reference into a uniquely owned global type.
   GlobalType(Ref other) : GlobalType(wasm_globaltype_copy(other.ptr)) {}
+  /// Copies othe type information into this one.
   GlobalType(const GlobalType &other)
       : GlobalType(wasm_globaltype_copy(other.ptr.get())) {}
+  /// Copies othe type information into this one.
   GlobalType &operator=(const GlobalType &other) {
     ptr.reset(wasm_globaltype_copy(other.ptr.get()));
     return *this;
   }
   ~GlobalType() = default;
+  /// Moves the underlying type information from another global into this one.
   GlobalType(GlobalType &&other) = default;
+  /// Moves the underlying type information from another global into this one.
   GlobalType &operator=(GlobalType &&other) = default;
 
+  /// \brief Returns the underlying `Ref`, a non-owning reference pointing to
+  /// this instance.
   Ref *operator->() { return &ref; }
+  /// \brief Returns the underlying `Ref`, a non-owning reference pointing to
+  /// this instance.
   Ref *operator*() { return &ref; }
 };
 
+/**
+ * \brief Type information for a WebAssembly function.
+ */
 class FuncType {
   friend class Func;
 
@@ -491,16 +722,22 @@ class FuncType {
   std::unique_ptr<wasm_functype_t, deleter> ptr;
 
 public:
+  /// Non-owning reference to a `FuncType`, must not be used after the original
+  /// owner has been deleted.
   class Ref {
     friend class FuncType;
     const wasm_functype_t *ptr;
 
   public:
+    /// Creates a new reference from the underlying C API representation.
     Ref(const wasm_functype_t *ptr) : ptr(ptr) {}
+    /// Creates a new reference to the given type.
     Ref(const FuncType &ty) : Ref(ty.ptr.get()) {}
 
+    /// Returns the list of types this function type takes as parameters.
     ValType::ListRef params() const { return wasm_functype_params(ptr); }
 
+    /// Returns the list of types this function type returns.
     ValType::ListRef results() const { return wasm_functype_results(ptr); }
   };
 
@@ -509,6 +746,7 @@ private:
   FuncType(wasm_functype_t *ptr) : ptr(ptr), ref(ptr) {}
 
 public:
+  /// Creates a new function type from the given list of parameters and results.
   FuncType(std::initializer_list<ValType> params,
            std::initializer_list<ValType> results)
       : ref(nullptr) {
@@ -528,45 +766,65 @@ public:
     ptr.reset(wasm_functype_new(&param_vec, &result_vec));
     ref = ptr.get();
   }
+
+  /// Copies a reference into a uniquely owned function type.
   FuncType(Ref other) : FuncType(wasm_functype_copy(other.ptr)) {}
+  /// Copies another type's information into this one.
   FuncType(const FuncType &other)
       : FuncType(wasm_functype_copy(other.ptr.get())) {}
+  /// Copies another type's information into this one.
   FuncType &operator=(const FuncType &other) {
     ptr.reset(wasm_functype_copy(other.ptr.get()));
     return *this;
   }
   ~FuncType() = default;
+  /// Moves type information from anothe type into this one.
   FuncType(FuncType &&other) = default;
+  /// Moves type information from anothe type into this one.
   FuncType &operator=(FuncType &&other) = default;
 
+  /// \brief Returns the underlying `Ref`, a non-owning reference pointing to
+  /// this instance.
   Ref *operator->() { return &ref; }
+  /// \brief Returns the underlying `Ref`, a non-owning reference pointing to
+  /// this instance.
   Ref *operator*() { return &ref; }
 };
 
+/**
+ * \brief Type information about a WebAssembly import.
+ */
 class ImportType {
 public:
+  /// Non-owning reference to an `ImportType`, must not be used after the
+  /// original owner is deleted.
   class Ref {
     friend class TypeList;
+    friend class ExternType;
 
     const wasm_importtype_t *ptr;
 
+    // TODO: can this circle be broken another way?
+    const wasm_externtype_t *raw_type() { return wasm_importtype_type(ptr); }
+
   public:
+    /// Creates a new reference from the raw underlying C API representation.
     Ref(const wasm_importtype_t *ptr) : ptr(ptr) {}
 
+    /// Returns the module name associated with this import.
     std::string_view module() {
       const auto *name = wasm_importtype_module(ptr);
       return std::string_view(name->data, name->size);
     }
 
+    /// Returns the field name associated with this import.
     std::string_view name() {
       const auto *name = wasm_importtype_name(ptr);
       return std::string_view(name->data, name->size);
     }
-
-    // TODO: can this circle be broken another way?
-    const wasm_externtype_t *raw_type() { return wasm_importtype_type(ptr); }
   };
 
+  /// An owned list of `ImportType` instances.
   class List {
     friend class InstanceType;
     friend class ModuleType;
@@ -574,8 +832,10 @@ public:
     wasm_importtype_vec_t list;
 
   public:
+    /// Creates an empty list
     List() : list({.size = 0, .data = nullptr}) {}
     List(const List &other) = delete;
+    /// Moves another list into this one.
     List(List &&other) noexcept : list(other.list) { other.list.size = 0; }
     ~List() {
       if (list.size > 0) {
@@ -584,29 +844,43 @@ public:
     }
 
     List &operator=(const List &other) = delete;
+    /// Moves another list into this one.
     List &operator=(List &&other) noexcept {
       std::swap(list, other.list);
       return *this;
     }
 
+    /// Iterator type, which is a list of non-owning `ImportType::Ref`
+    //instances.
     typedef const Ref *iterator;
+    /// Returns the start of iteration.
     iterator begin() const {
       return reinterpret_cast<iterator>(&list.data[0]); // NOLINT
     }
+    /// Returns the end of iteration.
     iterator end() const {
       return reinterpret_cast<iterator>(&list.data[list.size]); // NOLINT
     }
+    /// Returns the size of this list.
     size_t size() const { return list.size; }
   };
 };
 
+/**
+ * \brief Type information about a WebAssembly export
+ */
 class ExportType {
 
 public:
+  /// Non-owning reference to an `ExportType`.
   class Ref {
+    friend class ExternType;
+
     const wasm_exporttype_t *ptr;
 
+    const wasm_externtype_t *raw_type() { return wasm_exporttype_type(ptr); }
   public:
+    /// Creates a new reference from the raw underlying C API representation.
     Ref(const wasm_exporttype_t *ptr) : ptr(ptr) {}
 
     std::string_view name() {
@@ -614,9 +888,9 @@ public:
       return std::string_view(name->data, name->size);
     }
 
-    const wasm_externtype_t *raw_type() { return wasm_exporttype_type(ptr); }
   };
 
+  /// An owned list of `ExportType` instances.
   class List {
     friend class InstanceType;
     friend class ModuleType;
@@ -624,8 +898,10 @@ public:
     wasm_exporttype_vec_t list;
 
   public:
+    /// Creates an empty list
     List() : list({.size = 0, .data = nullptr}) {}
     List(const List &other) = delete;
+    /// Moves another list into this one.
     List(List &&other) noexcept : list(other.list) { other.list.size = 0; }
     ~List() {
       if (list.size > 0) {
@@ -634,18 +910,24 @@ public:
     }
 
     List &operator=(const List &other) = delete;
+    /// Moves another list into this one.
     List &operator=(List &&other) noexcept {
       std::swap(list, other.list);
       return *this;
     }
 
+    /// Iterator type, which is a list of non-owning `ExportType::Ref`
+    //instances.
     typedef const Ref *iterator;
+    /// Returns the start of iteration.
     iterator begin() const {
       return reinterpret_cast<iterator>(&list.data[0]); // NOLINT
     }
+    /// Returns the end of iteration.
     iterator end() const {
       return reinterpret_cast<iterator>(&list.data[list.size]); // NOLINT
     }
+    /// Returns the size of this list.
     size_t size() const { return list.size; }
   };
 };
@@ -1507,7 +1789,8 @@ public:
 
 class Instance;
 
-// TODO: ExternType?
+/// \typedef Extern
+/// \brief Representation of an external WebAssembly item
 typedef std::variant<Instance, Module, Func, Global, Memory, Table> Extern;
 
 class Instance {
