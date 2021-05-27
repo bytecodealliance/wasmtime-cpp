@@ -25,6 +25,7 @@ jobs:
       with:
         branch: gh-pages
         folder: html
+        single-commit: true
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
   test:
