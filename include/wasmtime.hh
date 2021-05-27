@@ -139,7 +139,8 @@ public:
     wasmtime_config_wasm_threads_set(ptr.get(), enable);
   }
 
-  /// \brief Configures whether the WebAssembly reference types proposal is enabled
+  /// \brief Configures whether the WebAssembly reference types proposal is
+  /// enabled
   ///
   /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.wasm_reference_types
   void wasm_reference_types(bool enable) {
@@ -167,7 +168,8 @@ public:
     wasmtime_config_wasm_multi_value_set(ptr.get(), enable);
   }
 
-  /// \brief Configures whether the WebAssembly module linking proposal is enabled
+  /// \brief Configures whether the WebAssembly module linking proposal is
+  /// enabled
   ///
   /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.wasm_module_linking
   void wasm_module_linking(bool enable) {
@@ -550,9 +552,10 @@ private:
 
 public:
   /// Creates a new wasm memory from the specified limits.
-  MemoryType(const Limits &limits) : MemoryType(wasm_memorytype_new(&limits.raw)) {}
+  MemoryType(const Limits &limits)
+      : MemoryType(wasm_memorytype_new(&limits.raw)) {}
   /// Creates a new wasm memory type from the specified ref, making a fresh
-  //owned value.
+  /// owned value.
   MemoryType(Ref other) : MemoryType(wasm_memorytype_copy(other.ptr)) {}
   /// Copies the provided type into a new type.
   MemoryType(const MemoryType &other)
@@ -851,7 +854,7 @@ public:
     }
 
     /// Iterator type, which is a list of non-owning `ImportType::Ref`
-    //instances.
+    /// instances.
     typedef const Ref *iterator;
     /// Returns the start of iteration.
     iterator begin() const {
@@ -881,6 +884,7 @@ public:
     const wasm_exporttype_t *ptr;
 
     const wasm_externtype_t *raw_type() { return wasm_exporttype_type(ptr); }
+
   public:
     /// Creates a new reference from the raw underlying C API representation.
     Ref(const wasm_exporttype_t *ptr) : ptr(ptr) {}
@@ -919,7 +923,7 @@ public:
     }
 
     /// Iterator type, which is a list of non-owning `ExportType::Ref`
-    //instances.
+    /// instances.
     typedef const Ref *iterator;
     /// Returns the start of iteration.
     iterator begin() const {
