@@ -1932,11 +1932,10 @@ class Func {
                                 nresults);
     Result<std::monostate, Trap> result =
         (*func)(Caller(caller), args_span, results_span);
-    if (result) {
-      return nullptr;
-    } else {
+    if (!result) {
       return result.err().ptr.release();
     }
+    return nullptr;
   }
 
   template <typename F> static void raw_finalize(void *env) {
@@ -2420,8 +2419,9 @@ public:
 
 std::optional<Extern> Caller::get_export(std::string_view name) {
   wasmtime_extern_t item;
-  if (wasmtime_caller_export_get(ptr, name.data(), name.size(), &item))
+  if (wasmtime_caller_export_get(ptr, name.data(), name.size(), &item)) {
     return Instance::cvt(item);
+  }
   return std::nullopt;
 }
 
