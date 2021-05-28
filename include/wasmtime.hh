@@ -6,7 +6,9 @@
  * C++ API is exclusively built on the [C API of
  * Wasmtime](https://docs.wasmtime.dev/c-api/), so the C++ support for this is
  * simply a single header file. To use this header file, though, it must be
- * combined with the header and binary of Wasmtime's C API.
+ * combined with the header and binary of Wasmtime's C API. Note, though, that
+ * while this header is built on top of the `wasmtime.h` header file you should
+ * only need to use the contents of this header file to interact with Wasmtime.
  *
  * Examples can be [found
  * online](https://github.com/bytecodealliance/wasmtime-cpp/tree/main/examples)
@@ -1752,7 +1754,8 @@ public:
       val.of.externref = ptr->ptr.release();
     }
   }
-  /// Creates a new `externref` WebAssembly value which is not `ref.null extern`.
+  /// Creates a new `externref` WebAssembly value which is not `ref.null
+  /// extern`.
   Val(ExternRef ptr);
   /// Copies the contents of another value into this one.
   Val(const Val &other) : val({.kind = WASMTIME_I32, .of = {.i32 = 0}}) {
@@ -2270,6 +2273,18 @@ public:
   }
 };
 
+/**
+ * \brief A WebAssembly instance.
+ *
+ * This class represents a WebAssembly instance, created by instantiating a
+ * module. An instance is the collection of items exported by the module, which
+ * can be accessed through the `Store` that owns the instance.
+ *
+ * Note that this type does not itself own any resources. It points to resources
+ * owned within a `Store` and the `Store` must be passed in as the first
+ * argument to the functions defined on `Instance`. Note that if the wrong
+ * `Store` is passed in then the process will be aborted.
+ */
 class Instance {
   friend class Linker;
   friend class Caller;
@@ -2319,8 +2334,25 @@ class Instance {
   }
 
 public:
+  /// Creates a new instance from the raw underlying C API representation.
   Instance(wasmtime_instance_t instance) : instance(instance) {}
 
+  /**
+   * \brief Instantiates the module `m` with the provided `imports`
+   *
+   * \param cx the store in which to instantiate the provided module
+   * \param m the module to instantiate
+   * \param imports the list of imports to use to instantiate the module
+   *
+   * This `imports` parameter is expected to line up 1:1 with the imports
+   * required by the `m`. The type of `m` can be inspected to determine in which
+   * order to provide the imports. Note that this is a relatively low-level API
+   * and it's generally recommended to use `Linker` instead for name-based
+   * instantiation.
+   *
+   * This function can return an error if any of the `imports` have the wrong
+   * type, or if the wrong number of `imports` is provided.
+   */
   [[nodiscard]] static TrapResult<Instance>
   create(Store::Context cx, const Module &m,
          const std::vector<Extern> &imports) {
@@ -2343,10 +2375,17 @@ public:
     return Instance(instance);
   }
 
+  /// Returns the type of this instance.
   InstanceType type(Store::Context cx) const {
     return wasmtime_instance_type(cx.ptr, &instance);
   }
 
+  /**
+   * \brief Load an instance's export by name.
+   *
+   * This function will look for an export named `name` on this instance and, if
+   * found, return it as an `Extern`.
+   */
   std::optional<Extern> get(Store::Context cx, std::string_view name) {
     wasmtime_extern_t e;
     if (!wasmtime_instance_export_get(cx.ptr, &instance, name.data(),
@@ -2356,6 +2395,12 @@ public:
     return Instance::cvt(e);
   }
 
+  /**
+   * \brief Load an instance's export by index.
+   *
+   * This function will look for the `idx`th export of this instance. This will
+   * return both the name of the export as well as the exported item itself.
+   */
   std::optional<std::pair<std::string_view, Extern>> get(Store::Context cx,
                                                          size_t idx) {
     wasmtime_extern_t e;
@@ -2380,6 +2425,13 @@ std::optional<Extern> Caller::get_export(std::string_view name) {
   return std::nullopt;
 }
 
+/**
+ * \brief Helper class for linking modules together with name-based resolution.
+ *
+ * This class is used for easily instantiating `Module`s by defining names into
+ * the linker and performing name-based resolution during instantiation. A
+ * `Linker` can also be used to link in WASI functions to instantiate a module.
+ */
 class Linker {
   struct deleter {
     void operator()(wasmtime_linker_t *p) const { wasmtime_linker_delete(p); }
@@ -2388,12 +2440,17 @@ class Linker {
   std::unique_ptr<wasmtime_linker_t, deleter> ptr;
 
 public:
+  /// Creates a new linker which will instantiate in the given engine.
   Linker(Engine &engine) : ptr(wasmtime_linker_new(engine.ptr.get())) {}
 
+  /// Configures whether shadowing previous names is allowed or not.
+  ///
+  /// By default shadowing is not allowed.
   void allow_shadowing(bool allow) {
     wasmtime_linker_allow_shadowing(ptr.get(), allow);
   }
 
+  /// Defines the provided item into this linker with the given name.
   [[nodiscard]] Result<std::monostate>
   define(std::string_view module, std::string_view name, const Extern &item) {
     wasmtime_extern_t raw;
@@ -2407,6 +2464,10 @@ public:
     return std::monostate();
   }
 
+  /// Defines WASI functions within this linker.
+  ///
+  /// Note that `Store::Context::set_wasi` must also be used for instantiated
+  /// modules to have access to configured WASI state.
   [[nodiscard]] Result<std::monostate> define_wasi() {
     auto *error = wasmtime_linker_define_wasi(ptr.get());
     if (error != nullptr) {
@@ -2415,6 +2476,8 @@ public:
     return std::monostate();
   }
 
+  /// Defines all exports of the `instance` provided in this linker with the
+  /// given module name of `name`.
   [[nodiscard]] Result<std::monostate>
   define_instance(Store::Context cx, std::string_view name, Instance instance) {
     auto *error = wasmtime_linker_define_instance(
@@ -2425,6 +2488,8 @@ public:
     return std::monostate();
   }
 
+  /// Instantiates the module `m` provided within the store `cx` using the items
+  /// defined within this linker.
   [[nodiscard]] TrapResult<Instance> instantiate(Store::Context cx,
                                                  const Module &m) {
     wasmtime_instance_t instance;
@@ -2440,6 +2505,8 @@ public:
     return Instance(instance);
   }
 
+  /// Defines instantiations of the module `m` within this linker under the
+  /// given `name`.
   [[nodiscard]] Result<std::monostate>
   module(Store::Context cx, std::string_view name, const Module &m) {
     auto *error = wasmtime_linker_module(ptr.get(), cx.ptr, name.data(),
@@ -2450,6 +2517,8 @@ public:
     return std::monostate();
   }
 
+  /// Attempts to load the specified named item from this linker, returning
+  /// `std::nullopt` if it was not defiend.
   [[nodiscard]] std::optional<Extern>
   get(Store::Context cx, std::string_view module, std::string_view name) {
     wasmtime_extern_t item;
@@ -2460,6 +2529,8 @@ public:
     return std::nullopt;
   }
 
+  /// Loads the "default" function, according to WASI commands and reactors, of
+  /// the module named `name` in this linker.
   [[nodiscard]] Result<Func> get_default(Store::Context cx,
                                          std::string_view name) {
     wasmtime_func_t item;
