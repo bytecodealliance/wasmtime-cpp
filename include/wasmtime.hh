@@ -16,6 +16,13 @@
  * [README](https://github.com/bytecodealliance/wasmtime-cpp/blob/main/README.md)
  * for simple usage instructions. Otherwise you can dive right in to the
  * reference documentation of \ref wasmtime.hh
+ *
+ * \example hello.cc
+ * \example gcd.cc
+ * \example linking.cc
+ * \example memory.cc
+ * \example interrupt.cc
+ * \example externref.cc
  */
 
 /**
