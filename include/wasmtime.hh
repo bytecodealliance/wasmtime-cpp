@@ -1061,22 +1061,35 @@ public:
   Ref *operator*() { return &ref; }
 };
 
+/**
+ * \brief Generic type of a WebAssembly item.
+ */
 class ExternType {
   friend class ExportType;
   friend class ImportType;
 
 public:
+  /// \typedef Ref
+  /// \brief Non-owning reference to an item's type
+  ///
+  /// This cannot be used after the original owner has been deleted, and
+  /// otherwise this is used to determine what the actual type of the outer item
+  /// is.
   typedef std::variant<FuncType::Ref, GlobalType::Ref, TableType::Ref,
                        MemoryType::Ref, ModuleType::Ref, InstanceType::Ref>
       Ref;
 
-  // TODO: can this circle be broken another way?
+  /// Extract the type of the item imported by the provided type.
   static Ref from_import(ImportType::Ref ty) {
+    // TODO: this would ideally be some sort of implicit constructor, unsure how
+    // to do that though...
     return ref_from_c(ty.raw_type());
   }
 
-  // TODO: can this circle be broken another way?
+  /// Extract the type of the item exported by the provided type.
   static Ref from_export(ExportType::Ref ty) {
+    // TODO: this would ideally be some sort of implicit constructor, unsure how
+    // to do that though...
     return ref_from_c(ty.raw_type());
   }
 
@@ -1104,14 +1117,31 @@ private:
   }
 };
 
+/**
+ * \brief Non-owning reference to a WebAssembly function frame as part of a
+ * `Trace`
+ *
+ * A `FrameRef` represents a WebAssembly function frame on the stack which was
+ * collected as part of a trap.
+ */
 class FrameRef {
   wasm_frame_t *frame;
 
 public:
+  /// Returns the WebAssembly function index of this function, in the original
+  /// module.
   uint32_t func_index() const { return wasm_frame_func_index(frame); }
+  /// Returns the offset, in bytes from the start of the function in the
+  /// original module, to this frame's program counter.
   size_t func_offset() const { return wasm_frame_func_offset(frame); }
+  /// Returns the offset, in bytes from the start of the original module,
+  /// to this frame's program counter.
   size_t module_offset() const { return wasm_frame_module_offset(frame); }
 
+  /// Returns the name, if present, associated with this function.
+  ///
+  /// Note that this requires that the `name` section is present in the original
+  /// WebAssembly binary.
   std::optional<std::string_view> func_name() const {
     const auto *name = wasmtime_frame_func_name(frame);
     if (name != nullptr) {
@@ -1120,6 +1150,10 @@ public:
     return std::nullopt;
   }
 
+  /// Returns the name, if present, associated with this function's module.
+  ///
+  /// Note that this requires that the `name` section is present in the original
+  /// WebAssembly binary.
   std::optional<std::string_view> module_name() const {
     const auto *name = wasmtime_frame_module_name(frame);
     if (name != nullptr) {
@@ -1129,6 +1163,13 @@ public:
   }
 };
 
+/**
+ * \brief An owned vector of `FrameRef` instances representing the WebAssembly
+ * call-stack on a trap.
+ *
+ * This can be used to iterate over the frames of a trap and determine what was
+ * running when a trap happened.
+ */
 class Trace {
   friend class Trap;
 
@@ -1144,17 +1185,31 @@ public:
   Trace &operator=(const Trace &other) = delete;
   Trace &operator=(Trace &&other) = delete;
 
+  /// Iterator used to iterate over this trace.
   typedef const FrameRef *iterator;
 
+  /// Returns the start of iteration
   iterator begin() const {
     return reinterpret_cast<FrameRef *>(&vec.data[0]); // NOLINT
   }
+  /// Returns the end of iteration
   iterator end() const {
     return reinterpret_cast<FrameRef *>(&vec.data[vec.size]); // NOLINT
   }
+  /// Returns the size of this trace, or how many frames it contains.
   size_t size() const { return vec.size; }
 };
 
+/**
+ * \brief Information about a WebAssembly trap.
+ *
+ * Traps can happen during normal wasm execution (such as the `unreachable`
+ * instruction) but they can also happen in host-provided functions to a host
+ * function can simulate raising a trap.
+ *
+ * Traps have a message associated with them as well as a trace of WebAssembly
+ * frames on the stack.
+ */
 class Trap {
   friend class Linker;
   friend class Instance;
@@ -1169,9 +1224,11 @@ class Trap {
   Trap(wasm_trap_t *ptr) : ptr(ptr) {}
 
 public:
+  /// Creates a new host-defined trap with the specified message.
   Trap(std::string_view msg)
       : Trap(wasmtime_trap_new(msg.data(), msg.size())) {}
 
+  /// Returns the descriptive message associated with this trap
   std::string message() const {
     wasm_byte_vec_t msg;
     wasm_trap_message(ptr.get(), &msg);
@@ -1180,6 +1237,8 @@ public:
     return ret;
   }
 
+  /// If this trap represents a call to `exit` for WASI, this will return the
+  /// optional error code associated with the exit trap.
   std::optional<int32_t> i32_exit() const {
     int32_t status = 0;
     if (wasmtime_trap_exit_status(ptr.get(), &status)) {
@@ -1188,6 +1247,7 @@ public:
     return std::nullopt;
   }
 
+  /// Returns the trace of WebAssembly frames associated with this trap.
   Trace trace() const {
     wasm_frame_vec_t frames;
     wasm_trap_trace(ptr.get(), &frames);
@@ -1195,12 +1255,17 @@ public:
   }
 };
 
+/// Structure used to represent either a `Trap` or an `Error`.
 struct TrapError {
+  /// Storage for what this trap represents.
   std::variant<Trap, Error> data;
 
+  /// Creates a new `TrapError` from a `Trap`
   TrapError(Trap t) : data(std::move(t)) {}
+  /// Creates a new `TrapError` from an `Error`
   TrapError(Error e) : data(std::move(e)) {}
 
+  /// Dispatches internally to return the message associated with this error.
   std::string message() {
     if (auto *trap = std::get_if<Trap>(&data)) {
       return trap->message();
@@ -1212,8 +1277,18 @@ struct TrapError {
   }
 };
 
+/// Result used by functions which can fail because of invariants being violated
+/// (such as a type error) as well as because of a WebAssembly trap.
 template <typename T> using TrapResult = Result<T, TrapError>;
 
+/**
+ * \brief Representation of a compiled WebAssembly module.
+ *
+ * This type contains JIT code of a compiled WebAssembly module. A `Module` is
+ * connected to an `Engine` and can only be instantiated within that `Engine`.
+ * You can inspect a `Module` for its type information. This is passed as an
+ * argument to other APIs to instantiate it.
+ */
 class Module {
   friend class Store;
   friend class Instance;
@@ -1228,15 +1303,25 @@ class Module {
   Module(wasmtime_module_t *raw) : ptr(raw) {}
 
 public:
+  /// Copies another module into this one.
   Module(const Module &other) : ptr(wasmtime_module_clone(other.ptr.get())) {}
+  /// Copies another module into this one.
   Module &operator=(const Module &other) {
     ptr.reset(wasmtime_module_clone(other.ptr.get()));
     return *this;
   }
   ~Module() = default;
+  /// Moves resources from another module into this one.
   Module(Module &&other) = default;
+  /// Moves resources from another module into this one.
   Module &operator=(Module &&other) = default;
 
+  /**
+   * \brief Compiles a module from the WebAssembly text format.
+   *
+   * This function will automatically use `wat2wasm` on the input and then
+   * delegate to the #compile function.
+   */
   [[nodiscard]] static Result<Module> compile(Engine &engine,
                                               std::string_view wat) {
     auto wasm = wat2wasm(wat);
@@ -1247,6 +1332,16 @@ public:
     return compile(engine, bytes);
   }
 
+  /**
+   * \brief Compiles a module from the WebAssembly binary format.
+   *
+   * This function compiles the provided WebAssembly binary specified by `wasm`
+   * within the compilation settings configured by `engine`. This method is
+   * synchronous and will not return until the module has finished compiling.
+   *
+   * This function can fail if the WebAssembly binary is invalid or doesn't
+   * validate (or similar).
+   */
   [[nodiscard]] static Result<Module> compile(Engine &engine,
                                               std::span<uint8_t> wasm) {
     wasmtime_module_t *ret = nullptr;
@@ -1258,6 +1353,12 @@ public:
     return Module(ret);
   }
 
+  /**
+   * \brief Validates the provided WebAssembly binary without compiling it.
+   *
+   * This function will validate whether the provided binary is indeed valid
+   * within the compilation settings of the `engine` provided.
+   */
   [[nodiscard]] static Result<std::monostate>
   validate(Engine &engine, std::span<uint8_t> wasm) {
     auto *error =
@@ -1268,6 +1369,18 @@ public:
     return std::monostate();
   }
 
+  /**
+   * \brief Deserializes a previous list of bytes created with `serialize`.
+   *
+   * This function is intended to be much faster than `compile` where it uses
+   * the artifacts of a previous compilation to quickly create an in-memory
+   * module ready for instantiation.
+   *
+   * It is not safe to pass arbitrary input to this function, it is only safe to
+   * pass in output from previous calls to `serialize`. For more information see
+   * the Rust documentation -
+   * https://docs.wasmtime.dev/api/wasmtime/struct.Module.html#method.deserialize
+   */
   [[nodiscard]] static Result<Module> deserialize(Engine &engine,
                                                   std::span<uint8_t> wasm) {
     wasmtime_module_t *ret = nullptr;
@@ -1279,8 +1392,16 @@ public:
     return Module(ret);
   }
 
+  /// Returns the type of this module, which can be used to inspect the
+  /// imports/exports.
   ModuleType type() { return wasmtime_module_type(ptr.get()); }
 
+  /**
+   * \brief Serializes this module to a list of bytes.
+   *
+   * The returned bytes can then be used to later pass to `deserialize` to
+   * quickly recreate this module in a different process perhaps.
+   */
   [[nodiscard]] Result<std::vector<uint8_t>> serialize() const {
     wasm_byte_vec_t bytes;
     auto *error = wasmtime_module_serialize(ptr.get(), &bytes);
@@ -1296,6 +1417,9 @@ public:
   }
 };
 
+/**
+ * \brief Handle used to interrupt execution of WebAssembly from another thread.
+ */
 class InterruptHandle {
   friend class Store;
 
@@ -1310,9 +1434,16 @@ class InterruptHandle {
   InterruptHandle(wasmtime_interrupt_handle_t *ptr) : ptr(ptr) {}
 
 public:
+  /// Indicates that the WebAssembly executing in the store this handle is
+  /// connected to should be interrupted as soon as possible.
   void interrupt() const { wasmtime_interrupt_handle_interrupt(ptr.get()); }
 };
 
+/**
+ * \brief Configuration for an instance of WASI.
+ *
+ * This is inserted into a store with `Store::Context::set_wasi`.
+ */
 class WasiConfig {
   friend class Store;
 
@@ -1323,8 +1454,10 @@ class WasiConfig {
   std::unique_ptr<wasi_config_t, deleter> ptr;
 
 public:
+  /// Creates a new configuration object with default settings.
   WasiConfig() : ptr(wasi_config_new()) {}
 
+  /// Configures the argv explicitly with the given string array.
   void argv(const std::vector<std::string> &args) {
     std::vector<const char *> ptrs;
     ptrs.reserve(args.size());
@@ -1335,8 +1468,12 @@ public:
     wasi_config_set_argv(ptr.get(), (int)args.size(), ptrs.data());
   }
 
+  /// Configures the argv for wasm to be inherited from this process itself.
   void inherit_argv() { wasi_config_inherit_argv(ptr.get()); }
 
+  /// Configures the environment variables available to wasm, specified here as
+  /// a list of pairs where the first element of the pair is the key and the
+  /// second element is the value.
   void env(const std::vector<std::pair<std::string, std::string>> &env) {
     std::vector<const char *> names;
     std::vector<const char *> values;
@@ -1348,26 +1485,41 @@ public:
                         values.data());
   }
 
+  /// Indicates that the entire environment of this process should be inherited
+  /// by the wasi configuration.
   void inherit_env() { wasi_config_inherit_env(ptr.get()); }
 
+  /// Configures the provided file to be used for the stdin of this WASI
+  /// configuration.
   [[nodiscard]] bool stdin_file(const std::string &path) {
     return wasi_config_set_stdin_file(ptr.get(), path.c_str());
   }
 
+  /// Configures this WASI configuration to inherit its stdin from the host
+  /// process.
   void inherit_stdin() { return wasi_config_inherit_stdin(ptr.get()); }
 
+  /// Configures the provided file to be created and all stdout output will be
+  /// written there.
   [[nodiscard]] bool stdout_file(const std::string &path) {
     return wasi_config_set_stdout_file(ptr.get(), path.c_str());
   }
 
+  /// Configures this WASI configuration to inherit its stdout from the host
+  /// process.
   void inherit_stdout() { return wasi_config_inherit_stdout(ptr.get()); }
 
+  /// Configures the provided file to be created and all stderr output will be
+  /// written there.
   [[nodiscard]] bool stderr_file(const std::string &path) {
     return wasi_config_set_stderr_file(ptr.get(), path.c_str());
   }
 
+  /// Configures this WASI configuration to inherit its stdout from the host
+  /// process.
   void inherit_stderr() { return wasi_config_inherit_stderr(ptr.get()); }
 
+  /// Opens `path` to be opened as `guest_path` in the WASI pseudo-filesystem.
   [[nodiscard]] bool preopen_dir(const std::string &path,
                                  const std::string &guest_path) {
     return wasi_config_preopen_dir(ptr.get(), path.c_str(), guest_path.c_str());
@@ -1376,6 +1528,18 @@ public:
 
 class Caller;
 
+/**
+ * \brief Owner of all WebAssembly objects
+ *
+ * A `Store` owns all WebAssembly objects such as instances, globals, functions,
+ * memories, etc. A `Store` is one of the main central points about working with
+ * WebAssembly since it's an argument to almost all APIs. The `Store` serves as
+ * a form of "context" to give meaning to the pointers of `Func` and friends.
+ *
+ * A `Store` can be sent between threads but it cannot generally be shared
+ * concurrently between threads. Memory associated with WebAssembly instances
+ * will be deallocated when the `Store` is deallocated.
+ */
 class Store {
   struct deleter {
     void operator()(wasmtime_store_t *p) const { wasmtime_store_delete(p); }
@@ -1384,9 +1548,21 @@ class Store {
   std::unique_ptr<wasmtime_store_t, deleter> ptr;
 
 public:
+  /// Creates a new `Store` within the provided `Engine`.
   Store(Engine &engine)
       : ptr(wasmtime_store_new(engine.ptr.get(), nullptr, nullptr)) {}
 
+  /**
+   * \brief An interior pointer into a `Store`.
+   *
+   * A `Context` object is created from either a `Store` or a `Caller`. It is an
+   * interior pointer into a `Store` and cannot be used outside the lifetime of
+   * the original object it was created from.
+   *
+   * This object is an argument to most APIs in Wasmtime but typically doesn't
+   * need to be constructed explicitly since it can be created from a `Store&`
+   * or a `Caller&`.
+   */
   class Context {
     friend class Global;
     friend class Table;
@@ -1399,13 +1575,25 @@ public:
     Context(wasmtime_context_t *ptr) : ptr(ptr) {}
 
   public:
+    /// Creates a context referencing the provided `Store`.
     Context(Store &store) : Context(wasmtime_store_context(store.ptr.get())) {}
+    /// Creates a context referencing the provided `Store`.
     Context(Store *store) : Context(*store) {}
+    /// Creates a context referencing the provided `Caller`.
     Context(Caller &caller);
+    /// Creates a context referencing the provided `Caller`.
     Context(Caller *caller);
 
+    /// Runs a garbage collection pass in the referenced store to collect loose
+    /// `externref` values, if any are available.
     void gc() { wasmtime_context_gc(ptr); }
 
+    /// Injects fuel to be consumed within this store.
+    ///
+    /// Stores start with 0 fuel and if `Config::consume_fuel` is enabled then
+    /// this is required if you want to let WebAssembly actually execute.
+    ///
+    /// Returns an error if fuel consumption isn't enabled.
     [[nodiscard]] Result<std::monostate> add_fuel(uint64_t fuel) {
       auto *error = wasmtime_context_add_fuel(ptr, fuel);
       if (error != nullptr) {
@@ -1414,6 +1602,9 @@ public:
       return std::monostate();
     }
 
+    /// Returns the amount of fuel consumed so far by executing WebAssembly.
+    ///
+    /// Returns `std::nullopt` if fuel consumption is not enabled.
     std::optional<uint64_t> fuel_consumed() const {
       uint64_t fuel = 0;
       if (wasmtime_context_fuel_consumed(ptr, &fuel)) {
@@ -1422,6 +1613,11 @@ public:
       return std::nullopt;
     }
 
+    /// Configures the WASI state used by this store.
+    ///
+    /// This will only have an effect if used in conjunction with
+    /// `Linker::define_wasi` because otherwise no host functions will use the
+    /// WASI state.
     [[nodiscard]] Result<std::monostate> set_wasi(WasiConfig config) {
       auto *error = wasmtime_context_set_wasi(ptr, config.ptr.release());
       if (error != nullptr) {
@@ -1430,6 +1626,10 @@ public:
       return std::monostate();
     }
 
+    /// Returns a handle, which can be sent to another thread, which can be used
+    /// to interrupt execution of WebAssembly within this `Store`.
+    ///
+    /// This requires `Config::interruptable` to be enabled to retun a handle.
     std::optional<InterruptHandle> interrupt_handle() {
       auto *handle = wasmtime_interrupt_handle_new(ptr);
       if (handle != nullptr) {
@@ -1439,9 +1639,19 @@ public:
     }
   };
 
+  /// Explicit function to acquire a `Context` from this store.
   Context context() { return this; }
 };
 
+/**
+ * \brief Representation of a WebAssembly `externref` value.
+ *
+ * This class represents an value that cannot be forged by WebAssembly itself.
+ * All `ExternRef` values are guaranteed to be created by the host and its
+ * embedding. It's suitable to place private data structures in here which
+ * WebAssembly will not have access to, only other host functions will have
+ * access to them.
+ */
 class ExternRef {
   friend class Val;
 
@@ -1460,26 +1670,53 @@ class ExternRef {
   ExternRef(wasmtime_externref_t *ptr) : ptr(ptr) {}
 
 public:
+  /// Creates a new `externref` value from the provided argument.
+  ///
+  /// Note that `val` should be safe to send across threads and should own any
+  /// memory that it points to. Also note that `ExternRef` is similar to a
+  /// `std::shared_ptr` in that there can be many references to the same value.
   ExternRef(std::any val)
       : ExternRef(wasmtime_externref_new(
             std::make_unique<std::any>(std::move(val)).release(), finalizer)) {}
+  /// Performs a shallow copy of another `externref` value, creating another
+  /// reference to it.
   ExternRef(const ExternRef &other)
       : ExternRef(wasmtime_externref_clone(other.ptr.get())) {}
+  /// Performs a shallow copy of another `externref` value, creating another
+  /// reference to it.
   ExternRef &operator=(const ExternRef &other) {
     ptr.reset(wasmtime_externref_clone(other.ptr.get()));
     return *this;
   }
+  /// Moves the resources pointed to by `other` into `this`.
   ExternRef(ExternRef &&other) = default;
+  /// Moves the resources pointed to by `other` into `this`.
   ExternRef &operator=(ExternRef &&other) = default;
   ~ExternRef() = default;
 
+  /// Returns the underlying host data associated with this `ExternRef`.
   std::any &data() {
     return *static_cast<std::any *>(wasmtime_externref_data(ptr.get()));
   }
 };
 
 class Func;
+class Global;
+class Instance;
+class Memory;
+class Table;
 
+/// \typedef Extern
+/// \brief Representation of an external WebAssembly item
+typedef std::variant<Instance, Module, Func, Global, Memory, Table> Extern;
+
+/**
+ * \brief Representation of a generic WebAssembly value.
+ *
+ * This is roughly equivalent to a tagged union of all possible WebAssembly
+ * values. This is later used as an argument with functions, globals, tables,
+ * etc.
+ */
 class Val {
   friend class Global;
   friend class Table;
@@ -1491,26 +1728,37 @@ class Val {
   Val(wasmtime_val_t val) : val(val) {}
 
 public:
+  /// Creates a new `i32` WebAssembly value.
   Val(int32_t i32) : val({.kind = WASMTIME_I32, .of = {.i32 = i32}}) {}
+  /// Creates a new `i64` WebAssembly value.
   Val(int64_t i64) : val({.kind = WASMTIME_I64, .of = {.i64 = i64}}) {}
+  /// Creates a new `f32` WebAssembly value.
   Val(float f32) : val({.kind = WASMTIME_F32, .of = {.f32 = f32}}) {}
+  /// Creates a new `f64` WebAssembly value.
   Val(double f64) : val({.kind = WASMTIME_F64, .of = {.f64 = f64}}) {}
+  /// Creates a new `v128` WebAssembly value.
   Val(const wasmtime_v128 &v128)
       : val({.kind = WASMTIME_V128, .of = {.i32 = 0}}) {
     memcpy(&val.of.v128[0], &v128[0], sizeof(wasmtime_v128));
   }
+  /// Creates a new `funcref` WebAssembly value.
   Val(std::optional<Func> func);
+  /// Creates a new `funcref` WebAssembly value which is not `ref.null func`.
   Val(Func func);
+  /// Creates a new `externref` value.
   Val(std::optional<ExternRef> ptr)
       : val({.kind = WASMTIME_EXTERNREF, .of = {.externref = nullptr}}) {
     if (ptr) {
       val.of.externref = ptr->ptr.release();
     }
   }
+  /// Creates a new `externref` WebAssembly value which is not `ref.null extern`.
   Val(ExternRef ptr);
+  /// Copies the contents of another value into this one.
   Val(const Val &other) : val({.kind = WASMTIME_I32, .of = {.i32 = 0}}) {
     wasmtime_val_copy(&val, &other.val);
   }
+  /// Moves the resources from another value into this one.
   Val(Val &&other) noexcept : val({.kind = WASMTIME_I32, .of = {.i32 = 0}}) {
     std::swap(val, other.val);
   }
@@ -1521,6 +1769,7 @@ public:
     }
   }
 
+  /// Copies the contents of another value into this one.
   Val &operator=(const Val &other) noexcept {
     if (val.kind == WASMTIME_EXTERNREF && val.of.externref != nullptr) {
       wasmtime_externref_delete(val.of.externref);
@@ -1528,11 +1777,13 @@ public:
     wasmtime_val_copy(&val, &other.val);
     return *this;
   }
+  /// Moves the resources from another value into this one.
   Val &operator=(Val &&other) noexcept {
     std::swap(val, other.val);
     return *this;
   }
 
+  /// Returns the kind of value that this value has.
   ValKind kind() const {
     switch (val.kind) {
     case WASMTIME_I32:
@@ -1553,6 +1804,8 @@ public:
     std::abort();
   }
 
+  /// Returns the underlying `i32`, requires `kind() == KindI32` or aborts the
+  /// process.
   int32_t i32() const {
     if (val.kind != WASMTIME_I32) {
       std::abort();
@@ -1560,6 +1813,8 @@ public:
     return val.of.i32;
   }
 
+  /// Returns the underlying `i64`, requires `kind() == KindI64` or aborts the
+  /// process.
   int64_t i64() const {
     if (val.kind != WASMTIME_I64) {
       std::abort();
@@ -1567,6 +1822,8 @@ public:
     return val.of.i64;
   }
 
+  /// Returns the underlying `f32`, requires `kind() == KindF32` or aborts the
+  /// process.
   float f32() const {
     if (val.kind != WASMTIME_F32) {
       std::abort();
@@ -1574,6 +1831,8 @@ public:
     return val.of.f32;
   }
 
+  /// Returns the underlying `f64`, requires `kind() == KindF64` or aborts the
+  /// process.
   double f64() const {
     if (val.kind != WASMTIME_F64) {
       std::abort();
@@ -1581,6 +1840,8 @@ public:
     return val.of.f64;
   }
 
+  /// Returns the underlying `v128`, requires `kind() == KindV128` or aborts
+  /// the process.
   const wasmtime_v128 &v128() const {
     if (val.kind != WASMTIME_V128) {
       std::abort();
@@ -1588,6 +1849,11 @@ public:
     return val.of.v128;
   }
 
+  /// Returns the underlying `externref`, requires `kind() == KindExternRef` or
+  /// aborts the process.
+  ///
+  /// Note that `externref` is a nullable reference, hence the `optional` return
+  /// value.
   std::optional<ExternRef> externref() const {
     if (val.kind != WASMTIME_EXTERNREF) {
       std::abort();
@@ -1598,9 +1864,21 @@ public:
     return std::nullopt;
   }
 
+  /// Returns the underlying `funcref`, requires `kind() == KindFuncRef` or
+  /// aborts the process.
+  ///
+  /// Note that `funcref` is a nullable reference, hence the `optional` return
+  /// value.
   std::optional<Func> funcref() const;
 };
 
+/**
+ * \brief Structure provided to host functions to lookup caller information or
+ * acquire a `Store::Context`.
+ *
+ * This structure is passed to all host functions created with `Func`. It can be
+ * used to create a `Store::Context`.
+ */
 class Caller {
   friend class Func;
   friend class Store;
@@ -1608,6 +1886,13 @@ class Caller {
   Caller(wasmtime_caller_t *ptr) : ptr(ptr) {}
 
 public:
+  /// Attempts to load an exported item from the calling instance.
+  ///
+  /// For more information see the Rust documentation -
+  /// https://docs.wasmtime.dev/api/wasmtime/struct.Caller.html#method.get_export
+  std::optional<Extern> get_export(std::string_view name);
+
+  /// Explicitly acquire a `Store::Context` from this `Caller`.
   Store::Context context() { return this; }
 };
 
@@ -1615,6 +1900,17 @@ Store::Context::Context(Caller &caller)
     : Context(wasmtime_caller_context(caller.ptr)) {}
 Store::Context::Context(Caller *caller) : Context(*caller) {}
 
+/**
+ * \brief Representation of a WebAssembly function.
+ *
+ * This class represents a WebAssembly function, either created through
+ * instantiating a module or a host function.
+ *
+ * Note that this type does not itself own any resources. It points to resources
+ * owned within a `Store` and the `Store` must be passed in as the first
+ * argument to the functions defined on `Func`. Note that if the wrong `Store`
+ * is passed in then the process will be aborted.
+ */
 class Func {
   friend class Val;
   friend class Instance;
@@ -1631,27 +1927,75 @@ class Func {
         nargs);
     std::span<Val> results_span(reinterpret_cast<Val *>(results), // NOLINT
                                 nresults);
-    Result<std::monostate> result =
+    Result<std::monostate, Trap> result =
         (*func)(Caller(caller), args_span, results_span);
-    return nullptr;
+    if (result) {
+      return nullptr;
+    } else {
+      return result.err().ptr.release();
+    }
   }
 
   template <typename F> static void raw_finalize(void *env) {
-    std::unique_ptr<F> ptr;
-    ptr.reset(reinterpret_cast<F *>(env)); // NOLINT
+    std::unique_ptr<F> ptr(reinterpret_cast<F *>(env)); // NOLINT
   }
 
 public:
+  /// Creates a new function from the raw underlying C API representation.
   Func(wasmtime_func_t func) : func(func) {}
 
+  /**
+   * \brief Creates a new host-defined function.
+   *
+   * This constructor is used to create a host function within the store
+   * provided. This is how WebAssembly can call into the host and make use of
+   * external functionality.
+   *
+   * \param cx the store to create the function within
+   * \param ty the type of the function that will be created
+   * \param f the host callback to be executed when this function is called.
+   *
+   * The parameter `f` is expected to be a lambda (or a lambda lookalike) which
+   * takes three parameters:
+   *
+   * * The first parameter is a `Caller` to get recursive access to the store
+   *   and other caller state.
+   * * The second parameter is a `std::span<const Val>` which is the list of
+   *   parameters to the function. These parameters are guaranteed to be of the
+   *   types specified by `ty` when constructing this function.
+   * * The last argument is `std::span<Val>` which is where to write the return
+   *   values of the function. The function must produce the types of values
+   *   specified by `ty` or otherwise a trap will be raised.
+   *
+   * The parameter `f` is expected to return `Result<std::monostate, Trap>`.
+   * This allows `f` to raise a trap if desired, or otherwise return no trap and
+   * finish successfully. If a trap is raised then the results pointer does not
+   * need to be written to.
+   */
   template <typename F>
   Func(Store::Context cx, const FuncType &ty, F f) : func({}) {
     wasmtime_func_new(cx.ptr, ty.ptr.get(), raw_callback<F>,
                       std::make_unique<F>(f).release(), raw_finalize<F>, &func);
   }
 
+  /**
+   * \brief Invoke a WebAssembly function.
+   *
+   * This function will execute this WebAssembly function. This function muts be
+   * defined within the `cx`'s store provided. The `params` argument is the list
+   * of parameters that are passed to the wasm function, and the types of the
+   * values within `params` must match the type signature of this function.
+   *
+   * This may return one of three values:
+   *
+   * * First the function could succeed, returning a vector of values
+   *   representing the results of the function.
+   * * Otherwise a `Trap` might be generated by the WebAssembly function.
+   * * Finally an `Error` could be returned indicating that `params` were not of
+   *   the right type.
+   */
   [[nodiscard]] TrapResult<std::vector<Val>>
-  call(Store::Context cx, const std::vector<Val> &params) {
+  call(Store::Context cx, const std::vector<Val> &params) const {
     std::vector<wasmtime_val_t> raw_params;
     raw_params.reserve(params.size());
     for (const auto &param : params) {
@@ -1679,6 +2023,7 @@ public:
     return results;
   }
 
+  /// Returns the type of this function.
   FuncType type(Store::Context cx) const {
     return wasmtime_func_type(cx.ptr, &func);
   }
@@ -1705,13 +2050,35 @@ std::optional<Func> Val::funcref() const {
   return Func(val.of.funcref);
 }
 
+/**
+ * \brief A WebAssembly global.
+ *
+ * This class represents a WebAssembly global, either created through
+ * instantiating a module or a host global. Globals contain a WebAssembly value
+ * and can be read and optionally written to.
+ *
+ * Note that this type does not itself own any resources. It points to resources
+ * owned within a `Store` and the `Store` must be passed in as the first
+ * argument to the functions defined on `Global`. Note that if the wrong `Store`
+ * is passed in then the process will be aborted.
+ */
 class Global {
   friend class Instance;
   wasmtime_global_t global;
 
 public:
+  /// Creates as global from the raw underlying C API representation.
   Global(wasmtime_global_t global) : global(global) {}
 
+  /**
+   * \brief Create a new WebAssembly global.
+   *
+   * \param cx the store in which to create the global
+   * \param ty the type that this global will have
+   * \param init the initial value of the global
+   *
+   * This function can fail if `init` does not have a value that matches `ty`.
+   */
   [[nodiscard]] static Result<Global>
   create(Store::Context cx, const GlobalType &ty, const Val &init) {
     wasmtime_global_t global;
@@ -1722,16 +2089,21 @@ public:
     return Global(global);
   }
 
+  /// Returns the type of this global.
   GlobalType type(Store::Context cx) const {
     return wasmtime_global_type(cx.ptr, &global);
   }
 
+  /// Returns the current value of this global.
   Val get(Store::Context cx) const {
     Val val;
     wasmtime_global_get(cx.ptr, &global, &val.val);
     return val;
   }
 
+  /// Sets this global to a new value.
+  ///
+  /// This can fail if `val` has the wrong type or if this global isn't mutable.
   [[nodiscard]] Result<std::monostate> set(Store::Context cx,
                                            const Val &val) const {
     auto *error = wasmtime_global_set(cx.ptr, &global, &val.val);
@@ -1742,13 +2114,35 @@ public:
   }
 };
 
+/**
+ * \brief A WebAssembly table.
+ *
+ * This class represents a WebAssembly table, either created through
+ * instantiating a module or a host table. Tables are contiguous vectors of
+ * WebAssembly reference types, currently either `externref` or `funcref`.
+ *
+ * Note that this type does not itself own any resources. It points to resources
+ * owned within a `Store` and the `Store` must be passed in as the first
+ * argument to the functions defined on `Table`. Note that if the wrong `Store`
+ * is passed in then the process will be aborted.
+ */
 class Table {
   friend class Instance;
   wasmtime_table_t table;
 
 public:
+  /// Creates a new table from the raw underlying C API representation.
   Table(wasmtime_table_t table) : table(table) {}
 
+  /**
+   * \brief Creates a new host-defined table.
+   *
+   * \param cx the store in which to create the table.
+   * \param ty the type of the table to be created
+   * \param init the initial value for all table slots.
+   *
+   * Returns an error if `init` has the wrong value for the `ty` specified.
+   */
   [[nodiscard]] static Result<Table>
   create(Store::Context cx, const TableType &ty, const Val &init) {
     wasmtime_table_t table;
@@ -1759,14 +2153,19 @@ public:
     return Table(table);
   }
 
+  /// Returns the type of this table.
   TableType type(Store::Context cx) const {
     return wasmtime_table_type(cx.ptr, &table);
   }
 
+  /// Returns the size, in elements, that the table currently has.
   size_t size(Store::Context cx) const {
     return wasmtime_table_size(cx.ptr, &table);
   }
 
+  /// Loads a value from the specified index in this table.
+  ///
+  /// Returns `std::nullopt` if `idx` is out of bounds.
   std::optional<Val> get(Store::Context cx, uint32_t idx) const {
     Val val;
     if (wasmtime_table_get(cx.ptr, &table, idx, &val.val)) {
@@ -1775,6 +2174,9 @@ public:
     return std::nullopt;
   }
 
+  /// Stores a value into the specified index in this table.
+  ///
+  /// Returns an error if `idx` is out of bounds or if `val` has the wrong type.
   [[nodiscard]] Result<std::monostate> set(Store::Context cx, uint32_t idx,
                                            const Val &val) const {
     auto *error = wasmtime_table_set(cx.ptr, &table, idx, &val.val);
@@ -1784,6 +2186,14 @@ public:
     return std::monostate();
   }
 
+  /// Grow this table.
+  ///
+  /// \param cx the store that owns this table.
+  /// \param delta the number of new elements to be added to this table.
+  /// \param init the initial value of all new elements in this table.
+  ///
+  /// Returns an error if `init` has the wrong type for this table. Otherwise
+  /// returns the previous size of the table before growth.
   [[nodiscard]] Result<uint32_t> grow(Store::Context cx, uint32_t delta,
                                       const Val &init) const {
     uint32_t prev = 0;
@@ -1795,13 +2205,26 @@ public:
   }
 };
 
+/**
+ * \brief A WebAssembly linear memory.
+ *
+ * This class represents a WebAssembly memory, either created through
+ * instantiating a module or a host memory.
+ *
+ * Note that this type does not itself own any resources. It points to resources
+ * owned within a `Store` and the `Store` must be passed in as the first
+ * argument to the functions defined on `Table`. Note that if the wrong `Store`
+ * is passed in then the process will be aborted.
+ */
 class Memory {
   friend class Instance;
   wasmtime_memory_t memory;
 
 public:
+  /// Creates a new memory from the raw underlying C API representation.
   Memory(wasmtime_memory_t memory) : memory(memory) {}
 
+  /// Creates a new host-defined memory with the type specified.
   [[nodiscard]] static Result<Memory> create(Store::Context cx,
                                              const MemoryType &ty) {
     wasmtime_memory_t memory;
@@ -1812,20 +2235,31 @@ public:
     return Memory(memory);
   }
 
+  /// Returns the type of this memory.
   MemoryType type(Store::Context cx) const {
     return wasmtime_memory_type(cx.ptr, &memory);
   }
 
+  /// Returns the size, in WebAssembly pages, of this memory.
   uint32_t size(Store::Context cx) const {
     return wasmtime_memory_size(cx.ptr, &memory);
   }
 
+  /// Returns a `span` of where this memory is located in the host.
+  ///
+  /// Note that embedders need to be very careful in their usage of the returned
+  /// `span`. It can be invalidated with calls to `grow` and/or calls into
+  /// WebAssembly.
   std::span<uint8_t> data(Store::Context cx) const {
     auto *base = wasmtime_memory_data(cx.ptr, &memory);
     auto size = wasmtime_memory_data_size(cx.ptr, &memory);
     return {base, size};
   }
 
+  /// Grows the memory by `delta` WebAssembly pages.
+  ///
+  /// On success returns the previous size of this memory in units of
+  /// WebAssembly pages.
   [[nodiscard]] Result<uint32_t> grow(Store::Context cx, uint32_t delta) const {
     uint32_t prev = 0;
     auto *error = wasmtime_memory_grow(cx.ptr, &memory, delta, &prev);
@@ -1836,14 +2270,9 @@ public:
   }
 };
 
-class Instance;
-
-/// \typedef Extern
-/// \brief Representation of an external WebAssembly item
-typedef std::variant<Instance, Module, Func, Global, Memory, Table> Extern;
-
 class Instance {
   friend class Linker;
+  friend class Caller;
 
   wasmtime_instance_t instance;
 
@@ -1943,6 +2372,13 @@ public:
     return std::pair(n, Instance::cvt(e));
   }
 };
+
+std::optional<Extern> Caller::get_export(std::string_view name) {
+  wasmtime_extern_t item;
+  if (wasmtime_caller_export_get(ptr, name.data(), name.size(), &item))
+    return Instance::cvt(item);
+  return std::nullopt;
+}
 
 class Linker {
   struct deleter {

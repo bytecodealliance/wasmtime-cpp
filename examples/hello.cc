@@ -44,7 +44,7 @@ int main() {
   // used to get access to our original `MyState` value.
   std::cout << "Creating callback...\n";
   FuncType ty({}, {});
-  Func host_func(store, ty, [](Caller caller, std::span<const Val> args, std::span<Val> results) -> Result<std::monostate> {
+  Func host_func(store, ty, [](auto caller, auto args, auto results) -> auto {
       std::cout << "Calling back...\n";
       (void) caller;
       (void) args;

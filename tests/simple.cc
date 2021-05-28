@@ -303,3 +303,44 @@ TEST(Linker, Smoke) {
   EXPECT_TRUE(linker.get(store, "a", "g"));
   unwrap(linker.get_default(store, "g"));
 }
+
+TEST(Caller, Smoke) {
+  Engine engine;
+  Store store(engine);
+  Func f(store, FuncType({}, {}), [](auto caller, auto params, auto results) -> auto {
+    EXPECT_FALSE(caller.get_export("foo"));
+    return std::monostate();
+  });
+  unwrap(f.call(store, {}));
+
+  Module m = unwrap(Module::compile(engine, "(module "
+    "(import \"\" \"\" (func))"
+    "(memory (export \"m\") 1)"
+    "(func (export \"f\") call 0)"
+  ")"));
+  Func f2(store, FuncType({}, {}), [](auto caller, auto params, auto results) -> auto {
+    EXPECT_FALSE(caller.get_export("foo"));
+    EXPECT_TRUE(caller.get_export("m"));
+    EXPECT_TRUE(caller.get_export("f"));
+    Memory m = std::get<Memory>(*caller.get_export("m"));
+    EXPECT_EQ(m.type(caller)->limits().min(), 1);
+    return std::monostate();
+  });
+  Instance i = unwrap(Instance::create(store, m, {f2}));
+  f = std::get<Func>(*i.get(store, "f"));
+  unwrap(f.call(store, {}));
+}
+
+TEST(Func, Smoke) {
+  Engine engine;
+  Store store(engine);
+  Func f(store, FuncType({}, {}), [](auto caller, auto params, auto results) -> auto {
+    return std::monostate();
+  });
+  unwrap(f.call(store, {}));
+
+  Func f2(store, FuncType({}, {}), [](auto caller, auto params, auto results) -> auto {
+    return Trap("message");
+  });
+  EXPECT_EQ(f2.call(store, {}).err().message(), "message");
+}
