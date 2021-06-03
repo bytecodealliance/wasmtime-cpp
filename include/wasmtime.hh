@@ -338,7 +338,7 @@ public:
   /// \brief Creates an engine with default compilation settings.
   Engine() : ptr(wasm_engine_new()) {}
   /// \brief Creates an engine with the specified compilation settings.
-  Engine(Config config)
+  explicit Engine(Config config)
       : ptr(wasm_engine_new_with_config(config.ptr.release())) {}
 };
 
@@ -378,7 +378,8 @@ class Limits {
 
 public:
   /// \brief Configures a minimum limit and no maximum limit.
-  Limits(uint32_t min) : raw({.min = min, .max = wasm_limits_max_default}) {}
+  explicit Limits(uint32_t min)
+      : raw({.min = min, .max = wasm_limits_max_default}) {}
   /// \brief Configures both a minimum and a maximum limit.
   Limits(uint32_t min, uint32_t max) : raw({.min = min, .max = max}) {}
   /// \brief Creates limits from the raw underlying C API.
@@ -578,7 +579,7 @@ private:
 
 public:
   /// Creates a new wasm memory from the specified limits.
-  MemoryType(const Limits &limits)
+  explicit MemoryType(const Limits &limits)
       : MemoryType(wasm_memorytype_new(&limits.raw)) {}
   /// Creates a new wasm memory type from the specified ref, making a fresh
   /// owned value.
@@ -1233,7 +1234,7 @@ class Trap {
 
 public:
   /// Creates a new host-defined trap with the specified message.
-  Trap(std::string_view msg)
+  explicit Trap(std::string_view msg)
       : Trap(wasmtime_trap_new(msg.data(), msg.size())) {}
 
   /// Returns the descriptive message associated with this trap
@@ -1557,7 +1558,7 @@ class Store {
 
 public:
   /// Creates a new `Store` within the provided `Engine`.
-  Store(Engine &engine)
+  explicit Store(Engine &engine)
       : ptr(wasmtime_store_new(engine.ptr.get(), nullptr, nullptr)) {}
 
   /**
@@ -1683,7 +1684,7 @@ public:
   /// Note that `val` should be safe to send across threads and should own any
   /// memory that it points to. Also note that `ExternRef` is similar to a
   /// `std::shared_ptr` in that there can be many references to the same value.
-  ExternRef(std::any val)
+  explicit ExternRef(std::any val)
       : ExternRef(wasmtime_externref_new(
             std::make_unique<std::any>(std::move(val)).release(), finalizer)) {}
   /// Performs a shallow copy of another `externref` value, creating another
@@ -2447,7 +2448,8 @@ class Linker {
 
 public:
   /// Creates a new linker which will instantiate in the given engine.
-  Linker(Engine &engine) : ptr(wasmtime_linker_new(engine.ptr.get())) {}
+  explicit Linker(Engine &engine)
+      : ptr(wasmtime_linker_new(engine.ptr.get())) {}
 
   /// Configures whether shadowing previous names is allowed or not.
   ///
