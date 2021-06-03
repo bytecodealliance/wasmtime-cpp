@@ -107,6 +107,36 @@ public:
   const T &&ok() const { return std::get<T>(std::move(data)); }
 };
 
+/// \brief Strategies passed to `Config::strategy`
+enum class Strategy {
+  /// Automatically selects the compilation strategy
+  Auto = WASMTIME_STRATEGY_AUTO,
+  /// Requires Cranelift to be used for compilation
+  Cranelift = WASMTIME_STRATEGY_CRANELIFT,
+  /// Uses lightbeam for compilation (not supported)
+  Lightbeam = WASMTIME_STRATEGY_LIGHTBEAM,
+};
+
+/// \brief Values passed to `Config::cranelift_opt_level`
+enum class OptLevel {
+  /// No extra optimizations performed
+  None = WASMTIME_OPT_LEVEL_NONE,
+  /// Optimize for speed
+  Speed = WASMTIME_OPT_LEVEL_SPEED,
+  /// Optimize for speed and generated code size
+  SpeedAndSize = WASMTIME_OPT_LEVEL_SPEED_AND_SIZE,
+};
+
+/// \brief Values passed to `Config::profiler`
+enum class ProfilingStrategy {
+  /// No profiling enabled
+  None = WASMTIME_PROFILING_STRATEGY_NONE,
+  /// Profiling hooks via perf's jitdump
+  Jitdump = WASMTIME_PROFILING_STRATEGY_JITDUMP,
+  /// Profiling hooks via VTune
+  Vtune = WASMTIME_PROFILING_STRATEGY_VTUNE,
+};
+
 /**
  * \brief Configuration for Wasmtime.
  *
@@ -203,22 +233,12 @@ public:
     wasmtime_config_wasm_module_linking_set(ptr.get(), enable);
   }
 
-  /// \brief Strategies passed to `Config::strategy`
-  enum Strategy {
-    /// Automatically selects the compilation strategy
-    Auto = WASMTIME_STRATEGY_AUTO,
-    /// Requires Cranelift to be used for compilation
-    Cranelift = WASMTIME_STRATEGY_CRANELIFT,
-    /// Uses lightbeam for compilation (not supported)
-    Lightbeam = WASMTIME_STRATEGY_LIGHTBEAM,
-  };
-
   /// \brief Configures compilation strategy for wasm code.
   ///
   /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.strategy
   [[nodiscard]] Result<std::monostate> strategy(Strategy strategy) {
     auto *error =
-        wasmtime_config_strategy_set(ptr.get(), (wasmtime_strategy_t)strategy);
+        wasmtime_config_strategy_set(ptr.get(), static_cast<wasmtime_strategy_t>(strategy));
     if (error != nullptr) {
       return Error(error);
     }
@@ -232,40 +252,20 @@ public:
     wasmtime_config_cranelift_debug_verifier_set(ptr.get(), enable);
   }
 
-  /// \brief Values passed to `Config::cranelift_opt_level`
-  enum OptLevel {
-    /// No extra optimizations performed
-    OptNone = WASMTIME_OPT_LEVEL_NONE,
-    /// Optimize for speed
-    OptSpeed = WASMTIME_OPT_LEVEL_SPEED,
-    /// Optimize for speed and generated code size
-    OptSpeedAndSize = WASMTIME_OPT_LEVEL_SPEED_AND_SIZE,
-  };
-
   /// \brief Configures cranelift's optimization level
   ///
   /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.cranelift_opt_level
   void cranelift_opt_level(OptLevel level) {
     wasmtime_config_cranelift_opt_level_set(ptr.get(),
-                                            (wasmtime_opt_level_t)level);
+                                            static_cast<wasmtime_opt_level_t>(level));
   }
-
-  /// \brief Values passed to `Config::profiler`
-  enum ProfilingStrategy {
-    /// No profiling enabled
-    ProfileNone = WASMTIME_PROFILING_STRATEGY_NONE,
-    /// Profiling hooks via perf's jitdump
-    ProfileJitdump = WASMTIME_PROFILING_STRATEGY_JITDUMP,
-    /// Profiling hooks via VTune
-    ProfileVtune = WASMTIME_PROFILING_STRATEGY_VTUNE,
-  };
 
   /// \brief Configures an active wasm profiler
   ///
   /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.profiler
   [[nodiscard]] Result<std::monostate> profiler(ProfilingStrategy profiler) {
     auto *error = wasmtime_config_profiler_set(
-        ptr.get(), (wasmtime_profiling_strategy_t)profiler);
+        ptr.get(), static_cast<wasmtime_profiling_strategy_t>(profiler));
     if (error != nullptr) {
       return Error(error);
     }
@@ -397,21 +397,21 @@ public:
 };
 
 /// Different kinds of types accepted by Wasmtime.
-enum ValKind {
+enum class ValKind {
   /// WebAssembly's `i32` type
-  KindI32,
+  I32,
   /// WebAssembly's `i64` type
-  KindI64,
+  I64,
   /// WebAssembly's `f32` type
-  KindF32,
+  F32,
   /// WebAssembly's `f64` type
-  KindF64,
+  F64,
   /// WebAssembly's `v128` type from the simd proposal
-  KindV128,
+  V128,
   /// WebAssembly's `externref` type from the reference types
-  KindExternRef,
+  ExternRef,
   /// WebAssembly's `funcref` type from the reference types
-  KindFuncRef,
+  FuncRef,
 };
 
 /**
@@ -432,22 +432,21 @@ class ValType {
 
   static wasm_valkind_t kind_to_c(ValKind kind) {
     switch (kind) {
-    case KindI32:
+    case ValKind::I32:
       return WASM_I32;
-    case KindI64:
+    case ValKind::I64:
       return WASM_I64;
-    case KindF32:
+    case ValKind::F32:
       return WASM_F32;
-    case KindF64:
+    case ValKind::F64:
       return WASM_F64;
-    case KindExternRef:
+    case ValKind::ExternRef:
       return WASM_ANYREF;
-    case KindFuncRef:
+    case ValKind::FuncRef:
       return WASM_FUNCREF;
-    case KindV128:
+    case ValKind::V128:
       return WASMTIME_V128;
     }
-    std::abort();
   }
 
 public:
@@ -468,19 +467,19 @@ public:
     ValKind kind() const {
       switch (wasm_valtype_kind(ptr)) {
       case WASM_I32:
-        return KindI32;
+        return ValKind::I32;
       case WASM_I64:
-        return KindI64;
+        return ValKind::I64;
       case WASM_F32:
-        return KindF32;
+        return ValKind::F32;
       case WASM_F64:
-        return KindF64;
+        return ValKind::F64;
       case WASM_ANYREF:
-        return KindExternRef;
+        return ValKind::ExternRef;
       case WASM_FUNCREF:
-        return KindFuncRef;
+        return ValKind::FuncRef;
       case WASMTIME_V128:
-        return KindV128;
+        return ValKind::V128;
       }
       std::abort();
     }
@@ -1797,19 +1796,19 @@ public:
   ValKind kind() const {
     switch (val.kind) {
     case WASMTIME_I32:
-      return KindI32;
+      return ValKind::I32;
     case WASMTIME_I64:
-      return KindI64;
+      return ValKind::I64;
     case WASMTIME_F32:
-      return KindF32;
+      return ValKind::F32;
     case WASMTIME_F64:
-      return KindF64;
+      return ValKind::F64;
     case WASMTIME_FUNCREF:
-      return KindFuncRef;
+      return ValKind::FuncRef;
     case WASMTIME_EXTERNREF:
-      return KindExternRef;
+      return ValKind::ExternRef;
     case WASMTIME_V128:
-      return KindV128;
+      return ValKind::V128;
     }
     std::abort();
   }

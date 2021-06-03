@@ -43,10 +43,10 @@ TEST(Config, Smoke) {
   config.wasm_bulk_memory(false);
   config.wasm_multi_value(false);
   config.wasm_module_linking(false);
-  unwrap(config.strategy(Config::Auto));
+  unwrap(config.strategy(Strategy::Auto));
   config.cranelift_debug_verifier(false);
-  config.cranelift_opt_level(Config::OptSpeed);
-  unwrap(config.profiler(Config::ProfileNone));
+  config.cranelift_opt_level(OptLevel::Speed);
+  unwrap(config.profiler(ProfilingStrategy::None));
   config.static_memory_maximum_size(0);
   config.static_memory_guard_size(0);
   config.dynamic_memory_guard_size(0);
@@ -141,46 +141,46 @@ TEST(ExternRef, Smoke) {
 
 TEST(Val, Smoke) {
   Val val(1);
-  EXPECT_EQ(val.kind(), KindI32);
+  EXPECT_EQ(val.kind(), ValKind::I32);
   EXPECT_EQ(val.i32(), 1);
 
   val = (int32_t) 3;
-  EXPECT_EQ(val.kind(), KindI32);
+  EXPECT_EQ(val.kind(), ValKind::I32);
   EXPECT_EQ(val.i32(), 3);
 
   val = (int64_t) 4;
-  EXPECT_EQ(val.kind(), KindI64);
+  EXPECT_EQ(val.kind(), ValKind::I64);
   EXPECT_EQ(val.i64(), 4);
 
   val = (float) 5;
-  EXPECT_EQ(val.kind(), KindF32);
+  EXPECT_EQ(val.kind(), ValKind::F32);
   EXPECT_EQ(val.f32(), 5);
 
   val = (double) 6;
-  EXPECT_EQ(val.kind(), KindF64);
+  EXPECT_EQ(val.kind(), ValKind::F64);
   EXPECT_EQ(val.f64(), 6);
 
   wasmtime_v128 v128 = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
   val = v128;
-  EXPECT_EQ(val.kind(), KindV128);
+  EXPECT_EQ(val.kind(), ValKind::V128);
   for (int i = 0; i < 16; i++) {
     EXPECT_EQ(val.v128()[i], i);
   }
 
   val = std::optional<ExternRef>(std::nullopt);
-  EXPECT_EQ(val.kind(), KindExternRef);
+  EXPECT_EQ(val.kind(), ValKind::ExternRef);
   EXPECT_EQ(val.externref(), std::nullopt);
 
   val = std::optional<ExternRef>(5);
-  EXPECT_EQ(val.kind(), KindExternRef);
+  EXPECT_EQ(val.kind(), ValKind::ExternRef);
   EXPECT_EQ(std::any_cast<int>(val.externref()->data()), 5);
 
   val = ExternRef(5);
-  EXPECT_EQ(val.kind(), KindExternRef);
+  EXPECT_EQ(val.kind(), ValKind::ExternRef);
   EXPECT_EQ(std::any_cast<int>(val.externref()->data()), 5);
 
   val = std::optional<Func>(std::nullopt);
-  EXPECT_EQ(val.kind(), KindFuncRef);
+  EXPECT_EQ(val.kind(), ValKind::FuncRef);
   EXPECT_EQ(val.funcref(), std::nullopt);
 
   Engine engine;
@@ -190,10 +190,10 @@ TEST(Val, Smoke) {
   });
 
   val = std::optional<Func>(func);
-  EXPECT_EQ(val.kind(), KindFuncRef);
+  EXPECT_EQ(val.kind(), ValKind::FuncRef);
 
   val = func;
-  EXPECT_EQ(val.kind(), KindFuncRef);
+  EXPECT_EQ(val.kind(), ValKind::FuncRef);
 
   Val other(1);
   val = other;
@@ -202,38 +202,38 @@ TEST(Val, Smoke) {
 TEST(Global, Smoke) {
   Engine engine;
   Store store(engine);
-  Global::create(store, GlobalType(KindI32, true), 3.0).err();
-  unwrap(Global::create(store, GlobalType(KindI32, true), 3));
-  unwrap(Global::create(store, GlobalType(KindI32, false), 3));
+  Global::create(store, GlobalType(ValKind::I32, true), 3.0).err();
+  unwrap(Global::create(store, GlobalType(ValKind::I32, true), 3));
+  unwrap(Global::create(store, GlobalType(ValKind::I32, false), 3));
 
-  Global g = unwrap(Global::create(store, GlobalType(KindI32, true), 4));
+  Global g = unwrap(Global::create(store, GlobalType(ValKind::I32, true), 4));
   EXPECT_EQ(g.get(store).i32(), 4);
   unwrap(g.set(store, 10));
   EXPECT_EQ(g.get(store).i32(), 10);
   g.set(store, 10.23).err();
   EXPECT_EQ(g.get(store).i32(), 10);
 
-  EXPECT_EQ(g.type(store)->content().kind(), KindI32);
+  EXPECT_EQ(g.type(store)->content().kind(), ValKind::I32);
   EXPECT_TRUE(g.type(store)->is_mutable());
 }
 
 TEST(Table, Smoke) {
   Engine engine;
   Store store(engine);
-  Table::create(store, TableType(KindI32, Limits(1)), 3.0).err();
+  Table::create(store, TableType(ValKind::I32, Limits(1)), 3.0).err();
 
   Val null = std::optional<Func>();
-  Table t = unwrap(Table::create(store, TableType(KindFuncRef, Limits(1)), null));
+  Table t = unwrap(Table::create(store, TableType(ValKind::FuncRef, Limits(1)), null));
   EXPECT_FALSE(t.get(store, 1));
   EXPECT_TRUE(t.get(store, 0));
   Val val = *t.get(store, 0);
-  EXPECT_EQ(val.kind(), KindFuncRef);
+  EXPECT_EQ(val.kind(), ValKind::FuncRef);
   EXPECT_FALSE(val.funcref());
   EXPECT_EQ(unwrap(t.grow(store, 4, null)), 1);
   unwrap(t.set(store, 3, null));
   t.set(store, 3, 3).err();
   EXPECT_EQ(t.size(store), 5);
-  EXPECT_EQ(t.type(store)->element().kind(), KindFuncRef);
+  EXPECT_EQ(t.type(store)->element().kind(), ValKind::FuncRef);
 }
 
 TEST(Memory, Smoke) {
@@ -250,8 +250,8 @@ TEST(Instance, Smoke) {
   Engine engine;
   Store store(engine);
   Memory m = unwrap(Memory::create(store, MemoryType(Limits(1))));
-  Global g = unwrap(Global::create(store, GlobalType(KindI32, false), 1));
-  Table t = unwrap(Table::create(store, TableType(KindFuncRef, Limits(1)), std::optional<Func>()));
+  Global g = unwrap(Global::create(store, GlobalType(ValKind::I32, false), 1));
+  Table t = unwrap(Table::create(store, TableType(ValKind::FuncRef, Limits(1)), std::optional<Func>()));
   Func f(store, FuncType({}, {}), [](auto caller, auto params, auto results) -> auto {
     return std::monostate();
   });
@@ -291,7 +291,7 @@ TEST(Linker, Smoke) {
   Linker linker(engine);
   Store store(engine);
   linker.allow_shadowing(false);
-  Global g = unwrap(Global::create(store, GlobalType(KindI32, false), 1));
+  Global g = unwrap(Global::create(store, GlobalType(ValKind::I32, false), 1));
   unwrap(linker.define("a", "g", g));
   unwrap(linker.define_wasi());
 

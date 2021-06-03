@@ -23,17 +23,17 @@ TEST(Limits, Smoke) {
 }
 
 TEST(ValType, Smoke) {
-  EXPECT_EQ(ValType(KindI32)->kind(), KindI32);
-  EXPECT_EQ(ValType(KindI64)->kind(), KindI64);
-  EXPECT_EQ(ValType(KindF32)->kind(), KindF32);
-  EXPECT_EQ(ValType(KindF64)->kind(), KindF64);
-  EXPECT_EQ(ValType(KindV128)->kind(), KindV128);
-  EXPECT_EQ(ValType(KindFuncRef)->kind(), KindFuncRef);
-  EXPECT_EQ(ValType(KindExternRef)->kind(), KindExternRef);
+  EXPECT_EQ(ValType(ValKind::I32)->kind(), ValKind::I32);
+  EXPECT_EQ(ValType(ValKind::I64)->kind(), ValKind::I64);
+  EXPECT_EQ(ValType(ValKind::F32)->kind(), ValKind::F32);
+  EXPECT_EQ(ValType(ValKind::F64)->kind(), ValKind::F64);
+  EXPECT_EQ(ValType(ValKind::V128)->kind(), ValKind::V128);
+  EXPECT_EQ(ValType(ValKind::FuncRef)->kind(), ValKind::FuncRef);
+  EXPECT_EQ(ValType(ValKind::ExternRef)->kind(), ValKind::ExternRef);
 
-  ValType t(KindI32);
-  t = KindI64;
-  ValType t2(KindF32);
+  ValType t(ValKind::I32);
+  t = ValKind::I64;
+  ValType t2(ValKind::F32);
   t = t2;
   ValType t3(t2);
 
@@ -51,20 +51,20 @@ TEST(MemoryType, Smoke) {
 }
 
 TEST(TableType, Smoke) {
-  TableType t(KindFuncRef, Limits(1));
+  TableType t(ValKind::FuncRef, Limits(1));
 
   EXPECT_EQ(t->limits().min(), 1);
   EXPECT_EQ(t->limits().max(), std::nullopt);
-  EXPECT_EQ(t->element().kind(), KindFuncRef);
+  EXPECT_EQ(t->element().kind(), ValKind::FuncRef);
 
   TableType t2 = t;
   t2 = t;
 }
 
 TEST(GlobalType, Smoke) {
-  GlobalType t(KindFuncRef, true);
+  GlobalType t(ValKind::FuncRef, true);
 
-  EXPECT_EQ(t->content().kind(), KindFuncRef);
+  EXPECT_EQ(t->content().kind(), ValKind::FuncRef);
   EXPECT_TRUE(t->is_mutable());
 
   GlobalType t2 = t;
@@ -79,14 +79,14 @@ TEST(FuncType, Smoke) {
   auto other = t;
   other = t;
 
-  FuncType t2({KindI32}, {KindI64});
+  FuncType t2({ValKind::I32}, {ValKind::I64});
   EXPECT_EQ(t2->params().size(), 1);
   for (auto ty : t2->params()) {
-    EXPECT_EQ(ty.kind(), KindI32);
+    EXPECT_EQ(ty.kind(), ValKind::I32);
   }
   EXPECT_EQ(t2->results().size(), 1);
   for (auto ty : t2->results()) {
-    EXPECT_EQ(ty.kind(), KindI64);
+    EXPECT_EQ(ty.kind(), ValKind::I64);
   }
 }
 
@@ -121,7 +121,7 @@ TEST(ModuleType, Smoke) {
   auto e = *exports.begin();
   EXPECT_EQ(e.name(), "x");
   auto export_ty = std::get<GlobalType::Ref>(ExternType::from_export(e));
-  EXPECT_EQ(export_ty.content().kind(), KindI32);
+  EXPECT_EQ(export_ty.content().kind(), ValKind::I32);
   EXPECT_FALSE(export_ty.is_mutable());
 
   for (auto &exp : exports) {}
@@ -156,6 +156,6 @@ TEST(InstanceType, Smoke) {
   auto e = *exports.begin();
   EXPECT_EQ(e.name(), "x");
   auto export_ty = std::get<GlobalType::Ref>(ExternType::from_export(e));
-  EXPECT_EQ(export_ty.content().kind(), KindI32);
+  EXPECT_EQ(export_ty.content().kind(), ValKind::I32);
   EXPECT_FALSE(export_ty.is_mutable());
 }
