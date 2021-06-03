@@ -97,10 +97,12 @@ jobs:
       shell: bash
     - run: |
         curl -LO https://github.com/bytecodealliance/wasmtime/releases/download/dev/wasmtime-dev-x86_64-macos-c-api.tar.xz
+        mkdir c-api
         tar xf wasmtime-dev-x86_64-macos-c-api.tar.xz -C c-api --strip-components=1
       if: matrix.os == 'macos-latest'
     - run: |
         curl -LO https://github.com/bytecodealliance/wasmtime/releases/download/dev/wasmtime-dev-x86_64-linux-c-api.tar.xz
+        mkdir c-api
         tar xf wasmtime-dev-x86_64-linux-c-api.tar.xz -C c-api --strip-components=1
       if: matrix.os == 'ubuntu-latest'
 
