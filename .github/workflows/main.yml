@@ -90,18 +90,18 @@ jobs:
 
     # Download the c-api directory
     - run: |
-        curl -LO https://github.com/alexcrichton/abc/releases/download/a/tarballs.zip
-        unzip tarballs.zip
-        mkdir c-api
-      shell: bash
-    - run: |
+        curl -LO https://github.com/bytecodealliance/wasmtime/releases/download/dev/wasmtime-dev-x86_64-windows-c-api.zip
         unzip wasmtime-dev-x86_64-windows-c-api.zip
-        mv wasmtime-dev-x86_64-windows-c-api/* c-api
+        mv wasmtime-dev-x86_64-windows-c-api c-api
       if: matrix.os == 'windows-latest'
       shell: bash
-    - run: tar xf wasmtime-dev-x86_64-macos-c-api.tar.xz -C c-api --strip-components=1
+    - run: |
+        curl -LO https://github.com/bytecodealliance/wasmtime/releases/download/dev/wasmtime-dev-x86_64-macos-c-api.tar.xz
+        tar xf wasmtime-dev-x86_64-macos-c-api.tar.xz -C c-api --strip-components=1
       if: matrix.os == 'macos-latest'
-    - run: tar xf wasmtime-dev-x86_64-linux-c-api.tar.xz -C c-api --strip-components=1
+    - run: |
+        curl -LO https://github.com/bytecodealliance/wasmtime/releases/download/dev/wasmtime-dev-x86_64-linux-c-api.tar.xz
+        tar xf wasmtime-dev-x86_64-linux-c-api.tar.xz -C c-api --strip-components=1
       if: matrix.os == 'ubuntu-latest'
 
     - run: sudo apt-get update -y && sudo apt-get install -y gcc-10
