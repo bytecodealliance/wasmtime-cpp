@@ -237,8 +237,8 @@ public:
   ///
   /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.strategy
   [[nodiscard]] Result<std::monostate> strategy(Strategy strategy) {
-    auto *error =
-        wasmtime_config_strategy_set(ptr.get(), static_cast<wasmtime_strategy_t>(strategy));
+    auto *error = wasmtime_config_strategy_set(
+        ptr.get(), static_cast<wasmtime_strategy_t>(strategy));
     if (error != nullptr) {
       return Error(error);
     }
@@ -256,8 +256,8 @@ public:
   ///
   /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.cranelift_opt_level
   void cranelift_opt_level(OptLevel level) {
-    wasmtime_config_cranelift_opt_level_set(ptr.get(),
-                                            static_cast<wasmtime_opt_level_t>(level));
+    wasmtime_config_cranelift_opt_level_set(
+        ptr.get(), static_cast<wasmtime_opt_level_t>(level));
   }
 
   /// \brief Configures an active wasm profiler
