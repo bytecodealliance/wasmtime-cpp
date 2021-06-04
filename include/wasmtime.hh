@@ -94,7 +94,7 @@ public:
 
   /// \brief Returns `true` if this result is a success, `false` if it's an
   /// error
-  operator bool() { return data.index() == 0; }
+  explicit operator bool() { return data.index() == 0; }
 
   /// \brief Returns the error, if present, aborts if this is not an error.
   E &&err() { return std::get<E>(std::move(data)); }
