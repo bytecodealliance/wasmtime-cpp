@@ -5,15 +5,6 @@
 
 using namespace wasmtime;
 
-template<typename T, typename E>
-T unwrap(Result<T, E> result) {
-  if (result) {
-    return result.ok();
-  }
-  std::cerr << "error: " << result.err().message() << "\n";
-  std::abort();
-}
-
 std::string readFile(const char* name) {
   std::ifstream watFile;
   watFile.open(name);
@@ -29,7 +20,7 @@ int main() {
   // default like this is here.
   std::cout << "Compiling module\n";
   Engine engine;
-  auto module = unwrap(Module::compile(engine, readFile("examples/hello.wat")));
+  auto module = Module::compile(engine, readFile("examples/hello.wat")).unwrap();
 
   // After a module is compiled we create a `Store` which will contain
   // instantiated modules and other items like host functions. A Store
@@ -56,7 +47,7 @@ int main() {
   // phase, pairing together a compiled module as well as a set of imports.
   // Note that this is where the wasm `start` function, if any, would run.
   std::cout << "Instantiating module...\n";
-  auto instance = unwrap(Instance::create(store, module, {host_func}));
+  auto instance = Instance::create(store, module, {host_func}).unwrap();
 
   // Next we poke around a bit to extract the `run` function from the module.
   std::cout << "Extracting export...\n";
@@ -64,7 +55,7 @@ int main() {
 
   // And last but not least we can call it!
   std::cout << "Calling export...\n";
-  unwrap(run.call(store, {}));
+  run.call(store, {}).unwrap();
 
   std::cout << "Done\n";
 }

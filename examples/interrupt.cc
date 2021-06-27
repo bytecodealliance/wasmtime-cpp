@@ -27,15 +27,6 @@ to tweak the `-lpthread` and such annotations as well as the name of the
 
 using namespace wasmtime;
 
-template<typename T, typename E>
-T unwrap(Result<T, E> result) {
-  if (result) {
-    return result.ok();
-  }
-  std::cerr << "error: " << result.err().message() << "\n";
-  std::abort();
-}
-
 std::string readFile(const char* name) {
   std::ifstream watFile;
   watFile.open(name);
@@ -55,8 +46,8 @@ int main() {
 
   // Compile and instantiate a small example with an infinite loop.
   auto wat = readFile("examples/interrupt.wat");
-  Module module = unwrap(Module::compile(engine, wat));
-  Instance instance = unwrap(Instance::create(store, module, {}));
+  Module module = Module::compile(engine, wat).unwrap();
+  Instance instance = Instance::create(store, module, {}).unwrap();
   Func run = std::get<Func>(*instance.get(store, "run"));
 
   // Spin up a thread to send us an interrupt in a second

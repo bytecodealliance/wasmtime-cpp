@@ -5,15 +5,6 @@
 
 using namespace wasmtime;
 
-template<typename T, typename E>
-T unwrap(Result<T, E> result) {
-  if (result) {
-    return result.ok();
-  }
-  std::cerr << "error: " << result.err().message() << "\n";
-  std::abort();
-}
-
 std::string readFile(const char* name) {
   std::ifstream watFile;
   watFile.open(name);
@@ -29,9 +20,9 @@ int main() {
 
   std::cout << "Compiling module...\n";
   auto wat = readFile("examples/externref.wat");
-  Module module = unwrap(Module::compile(engine, wat));
+  Module module = Module::compile(engine, wat).unwrap();
   std::cout << "Instantiating module...\n";
-  Instance instance = unwrap(Instance::create(store, module, {}));
+  Instance instance = Instance::create(store, module, {}).unwrap();
 
   ExternRef externref(std::string("Hello, world!"));
   std::any &data = externref.data();
@@ -39,19 +30,19 @@ int main() {
 
   std::cout << "Touching `externref` table..\n";
   Table table = std::get<Table>(*instance.get(store, "table"));
-  unwrap(table.set(store, 3, externref));
+  table.set(store, 3, externref).unwrap();
   ExternRef val = *table.get(store, 3)->externref();
   std::cout << "externref data: " << std::any_cast<std::string>(val.data()) << "\n";
 
   std::cout << "Touching `externref` global..\n";
   Global global = std::get<Global>(*instance.get(store, "global"));
-  unwrap(global.set(store, externref));
+  global.set(store, externref).unwrap();
   val = *global.get(store).externref();
   std::cout << "externref data: " << std::any_cast<std::string>(val.data()) << "\n";
 
   std::cout << "Calling `externref` func..\n";
   Func func = std::get<Func>(*instance.get(store, "func"));
-  auto results = unwrap(func.call(store, {externref}));
+  auto results = func.call(store, {externref}).unwrap();
   val = *results[0].externref();
   std::cout << "externref data: " << std::any_cast<std::string>(val.data()) << "\n";
 

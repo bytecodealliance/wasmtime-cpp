@@ -105,6 +105,15 @@ public:
   T &&ok() { return std::get<T>(std::move(data)); }
   /// \brief Returns the success, if present, aborts if this is an error.
   const T &&ok() const { return std::get<T>(std::move(data)); }
+
+  /// \brief Returns the success, if present, aborts if this is an error.
+  T unwrap() {
+    if (*this) {
+      return this->ok();
+    }
+    std::cerr << "error: " << this->err().message() << "\n";
+    std::abort();
+  }
 };
 
 /// \brief Strategies passed to `Config::strategy`

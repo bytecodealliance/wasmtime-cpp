@@ -31,8 +31,8 @@ int main() {
   std::string linking2_wat = readFile("examples/linking2.wat");
 
   // Compile our two modules
-  Module linking1_module = unwrap(Module::compile(engine, linking1_wat));
-  Module linking2_module = unwrap(Module::compile(engine, linking2_wat));
+  Module linking1_module = Module::compile(engine, linking1_wat).unwrap();
+  Module linking2_module = Module::compile(engine, linking2_wat).unwrap();
 
   // Configure WASI and store it within our `wasmtime_store_t`
   WasiConfig wasi;
@@ -41,20 +41,20 @@ int main() {
   wasi.inherit_stdin();
   wasi.inherit_stdout();
   wasi.inherit_stderr();
-  unwrap(store.context().set_wasi(std::move(wasi)));
+  store.context().set_wasi(std::move(wasi)).unwrap();
 
   // Create our linker which will be linking our modules together, and then add
   // our WASI instance to it.
   Linker linker(engine);
-  unwrap(linker.define_wasi());
+  linker.define_wasi().unwrap();
 
   // Instantiate our first module which only uses WASI, then register that
   // instance with the linker since the next linking will use it.
-  Instance linking2 = unwrap(linker.instantiate(store, linking2_module));
-  unwrap(linker.define_instance(store, "linking2", linking2));
+  Instance linking2 = linker.instantiate(store, linking2_module).unwrap();
+  linker.define_instance(store, "linking2", linking2).unwrap();
 
   // And with that we can perform the final link and the execute the module.
-  Instance linking1 = unwrap(linker.instantiate(store, linking1_module));
+  Instance linking1 = linker.instantiate(store, linking1_module).unwrap();
   Func f = std::get<Func>(*linking1.get(store, "run"));
-  unwrap(f.call(store, {}));
+  f.call(store, {}).unwrap();
 }
