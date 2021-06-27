@@ -1,14 +1,15 @@
 function(add_example name)
   add_executable(${name} ${name}.cc)
-  configure_wasmtime_target(${name})
-  add_test(NAME example-${name} COMMAND ${name}
-    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
-
+  target_link_libraries(${name} PRIVATE wasmtime-cpp)
   if (MSVC)
-    target_compile_options(${name} PUBLIC /W4 /WX)
+    target_compile_options(${name} INTERFACE /W4 /WX)
   else()
-    target_compile_options(${name} PUBLIC -Wall -Wextra -pedantic -Werror -Wno-unused-command-line-argument)
+    target_compile_options(${name} INTERFACE -Wall -Wextra -pedantic -Werror -Wno-unused-command-line-argument)
   endif()
+  add_test(
+    NAME example-${name}
+    COMMAND ${name}
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
 
   if(ENABLE_CODE_ANALYSIS)
     if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")

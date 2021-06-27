@@ -12,8 +12,7 @@ include(GoogleTest)
 function(add_test name)
 
   add_executable(test-${name} ${name}.cc)
-  target_link_libraries(test-${name} gtest_main)
-  configure_wasmtime_target(test-${name})
+  target_link_libraries(test-${name} PRIVATE wasmtime-cpp gtest_main)
 
   gtest_discover_tests(test-${name})
 endfunction()
