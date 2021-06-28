@@ -390,10 +390,15 @@ class Limits {
 
 public:
   /// \brief Configures a minimum limit and no maximum limit.
-  explicit Limits(uint32_t min)
-      : raw({.min = min, .max = wasm_limits_max_default}) {}
+  explicit Limits(uint32_t min) : raw{} {
+    raw.min = min;
+    raw.max = wasm_limits_max_default;
+  }
   /// \brief Configures both a minimum and a maximum limit.
-  Limits(uint32_t min, uint32_t max) : raw({.min = min, .max = max}) {}
+  Limits(uint32_t min, uint32_t max) : raw{} {
+    raw.min = min;
+    raw.max = max;
+  }
   /// \brief Creates limits from the raw underlying C API.
   Limits(const wasm_limits_t *limits) : raw(*limits) {}
 
@@ -875,7 +880,10 @@ public:
 
   public:
     /// Creates an empty list
-    List() : list({.size = 0, .data = nullptr}) {}
+    List() : list{} {
+      list.size = 0;
+      list.data = nullptr;
+    }
     List(const List &other) = delete;
     /// Moves another list into this one.
     List(List &&other) noexcept : list(other.list) { other.list.size = 0; }
@@ -944,7 +952,10 @@ public:
 
   public:
     /// Creates an empty list
-    List() : list({.size = 0, .data = nullptr}) {}
+    List() : list{} {
+      list.size = 0;
+      list.data = nullptr;
+    }
     List(const List &other) = delete;
     /// Moves another list into this one.
     List(List &&other) noexcept : list(other.list) { other.list.size = 0; }
@@ -1800,21 +1811,36 @@ class Val {
 
   wasmtime_val_t val;
 
-  Val() : val({.kind = WASMTIME_I32, .of = {.i32 = 0}}) {}
+  Val() : val{} {
+    val.kind = WASMTIME_I32;
+    val.of.i32 = 0;
+  }
   Val(wasmtime_val_t val) : val(val) {}
 
 public:
   /// Creates a new `i32` WebAssembly value.
-  Val(int32_t i32) : val({.kind = WASMTIME_I32, .of = {.i32 = i32}}) {}
+  Val(int32_t i32) : val{} {
+    val.kind = WASMTIME_I32;
+    val.of.i32 = i32;
+  }
   /// Creates a new `i64` WebAssembly value.
-  Val(int64_t i64) : val({.kind = WASMTIME_I64, .of = {.i64 = i64}}) {}
+  Val(int64_t i64) : val{} {
+    val.kind = WASMTIME_I64;
+    val.of.i64 = i64;
+  }
   /// Creates a new `f32` WebAssembly value.
-  Val(float f32) : val({.kind = WASMTIME_F32, .of = {.f32 = f32}}) {}
+  Val(float f32) : val{} {
+    val.kind = WASMTIME_F32;
+    val.of.f32 = f32;
+  }
   /// Creates a new `f64` WebAssembly value.
-  Val(double f64) : val({.kind = WASMTIME_F64, .of = {.f64 = f64}}) {}
+  Val(double f64) : val{} {
+    val.kind = WASMTIME_F64;
+    val.of.f64 = f64;
+  }
   /// Creates a new `v128` WebAssembly value.
-  Val(const wasmtime_v128 &v128)
-      : val({.kind = WASMTIME_V128, .of = {.i32 = 0}}) {
+  Val(const wasmtime_v128 &v128) : val{} {
+    val.kind = WASMTIME_V128;
     memcpy(&val.of.v128[0], &v128[0], sizeof(wasmtime_v128));
   }
   /// Creates a new `funcref` WebAssembly value.
@@ -1822,23 +1848,21 @@ public:
   /// Creates a new `funcref` WebAssembly value which is not `ref.null func`.
   Val(Func func);
   /// Creates a new `externref` value.
-  Val(std::optional<ExternRef> ptr)
-      : val({.kind = WASMTIME_EXTERNREF, .of = {.externref = nullptr}}) {
+  Val(std::optional<ExternRef> ptr) : val{} {
+    val.kind = WASMTIME_EXTERNREF;
     if (ptr) {
       val.of.externref = ptr->ptr.release();
+    } else {
+      val.of.externref = nullptr;
     }
   }
   /// Creates a new `externref` WebAssembly value which is not `ref.null
   /// extern`.
   Val(ExternRef ptr);
   /// Copies the contents of another value into this one.
-  Val(const Val &other) : val({.kind = WASMTIME_I32, .of = {.i32 = 0}}) {
-    wasmtime_val_copy(&val, &other.val);
-  }
+  Val(const Val &other) : val{} { wasmtime_val_copy(&val, &other.val); }
   /// Moves the resources from another value into this one.
-  Val(Val &&other) noexcept : val({.kind = WASMTIME_I32, .of = {.i32 = 0}}) {
-    std::swap(val, other.val);
-  }
+  Val(Val &&other) noexcept : val{} { std::swap(val, other.val); }
 
   ~Val() {
     if (val.kind == WASMTIME_EXTERNREF && val.of.externref != nullptr) {
@@ -2079,7 +2103,7 @@ public:
    * need to be written to.
    */
   template <typename F>
-  Func(Store::Context cx, const FuncType &ty, F f) : func({}) {
+  Func(Store::Context cx, const FuncType &ty, F f) : func{} {
     wasmtime_func_new(cx.ptr, ty.ptr.get(), raw_callback<F>,
                       std::make_unique<F>(f).release(), raw_finalize<F>, &func);
   }
@@ -2135,11 +2159,13 @@ public:
   }
 };
 
-Val::Val(std::optional<Func> func)
-    : val({.kind = WASMTIME_FUNCREF,
-           .of = {.funcref = {.store_id = 0, .index = 0}}}) {
+Val::Val(std::optional<Func> func) : val{} {
+  val.kind = WASMTIME_FUNCREF;
   if (func) {
     val.of.funcref = (*func).func;
+  } else {
+    val.of.funcref.store_id = 0;
+    val.of.funcref.index = 0;
   }
 }
 
