@@ -95,6 +95,11 @@ jobs:
           config: Debug
         - os: windows-latest
           config: Release
+
+        # C++20
+        - os: ubuntu-latest
+          config: Debug
+          args: -DCMAKE_CXX_COMPILER=clang++ -DCXX_STANDARD_20=YES
     steps:
     - uses: actions/checkout@v2
 

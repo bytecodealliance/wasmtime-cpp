@@ -37,9 +37,12 @@
 #include <iostream>
 #include <memory>
 #include <optional>
-#include <span>
 #include <variant>
 #include <vector>
+
+#if __has_include(<span>)
+#include <span>
+#endif
 
 #include "wasmtime.h"
 
@@ -369,9 +372,9 @@ public:
     return Error(error);
   }
   std::vector<uint8_t> vec;
-  // NOLINTNEXTLINE TODO can this be done without triggering lints?
-  std::span<uint8_t> raw(reinterpret_cast<uint8_t *>(ret.data), ret.size);
-  vec.assign(raw.begin(), raw.end());
+  // TODO can this be done without triggering lints?
+  uint8_t *start = reinterpret_cast<uint8_t *>(ret.data); // NOLINT
+  vec.assign(start, start + ret.size);                    // NOLINT
   wasm_byte_vec_delete(&ret);
   return vec;
 }
@@ -1347,8 +1350,26 @@ public:
       return wasm.err();
     }
     auto bytes = wasm.ok();
-    return compile(engine, bytes);
+    return compile(engine, &bytes[0], bytes.size());
   }
+
+  /**
+   * \brief Compiles a module from the WebAssembly binary format.
+   */
+  [[nodiscard]] static Result<Module>
+  compile(Engine &engine, const std::vector<uint8_t> &wasm) {
+    return Module::compile(engine, wasm.data(), wasm.size());
+  }
+
+#ifdef __cpp_lib_span
+  /**
+   * \brief Compiles a module from the WebAssembly binary format.
+   */
+  [[nodiscard]] static Result<Module> compile(Engine &engine,
+                                              std::span<uint8_t> wasm) {
+    return Module::compile(engine, wasm.data(), wasm.size());
+  }
+#endif
 
   /**
    * \brief Compiles a module from the WebAssembly binary format.
@@ -1360,11 +1381,10 @@ public:
    * This function can fail if the WebAssembly binary is invalid or doesn't
    * validate (or similar).
    */
-  [[nodiscard]] static Result<Module> compile(Engine &engine,
-                                              std::span<uint8_t> wasm) {
+  [[nodiscard]] static Result<Module>
+  compile(Engine &engine, const uint8_t *wasm, size_t wasm_len) {
     wasmtime_module_t *ret = nullptr;
-    auto *error =
-        wasmtime_module_new(engine.ptr.get(), wasm.data(), wasm.size(), &ret);
+    auto *error = wasmtime_module_new(engine.ptr.get(), wasm, wasm_len, &ret);
     if (error != nullptr) {
       return Error(error);
     }
@@ -1373,19 +1393,57 @@ public:
 
   /**
    * \brief Validates the provided WebAssembly binary without compiling it.
+   */
+  [[nodiscard]] static Result<std::monostate>
+  validate(Engine &engine, const std::vector<uint8_t> &wasm) {
+    return Module::validate(engine, wasm.data(), wasm.size());
+  }
+
+#ifdef __cpp_lib_span
+  /**
+   * \brief Validates the provided WebAssembly binary without compiling it.
    *
    * This function will validate whether the provided binary is indeed valid
    * within the compilation settings of the `engine` provided.
    */
   [[nodiscard]] static Result<std::monostate>
   validate(Engine &engine, std::span<uint8_t> wasm) {
-    auto *error =
-        wasmtime_module_validate(engine.ptr.get(), wasm.data(), wasm.size());
+    return Module::validate(engine, wasm.data(), wasm.size());
+  }
+#endif
+
+  /**
+   * \brief Validates the provided WebAssembly binary without compiling it.
+   *
+   * This function will validate whether the provided binary is indeed valid
+   * within the compilation settings of the `engine` provided.
+   */
+  [[nodiscard]] static Result<std::monostate>
+  validate(Engine &engine, const uint8_t *wasm, size_t wasm_len) {
+    auto *error = wasmtime_module_validate(engine.ptr.get(), wasm, wasm_len);
     if (error != nullptr) {
       return Error(error);
     }
     return std::monostate();
   }
+
+  /**
+   * \brief Deserializes a previous list of bytes created with `serialize`.
+   */
+  [[nodiscard]] static Result<Module>
+  deserialize(Engine &engine, const std::vector<uint8_t> &wasm) {
+    return Module::deserialize(engine, wasm.data(), wasm.size());
+  }
+
+#ifdef __cpp_lib_span
+  /**
+   * \brief Deserializes a previous list of bytes created with `serialize`.
+   */
+  [[nodiscard]] static Result<Module> deserialize(Engine &engine,
+                                                  std::span<uint8_t> wasm) {
+    return Module::deserialize(engine, wasm.data(), wasm.size());
+  }
+#endif
 
   /**
    * \brief Deserializes a previous list of bytes created with `serialize`.
@@ -1399,11 +1457,11 @@ public:
    * the Rust documentation -
    * https://docs.wasmtime.dev/api/wasmtime/struct.Module.html#method.deserialize
    */
-  [[nodiscard]] static Result<Module> deserialize(Engine &engine,
-                                                  std::span<uint8_t> wasm) {
+  [[nodiscard]] static Result<Module>
+  deserialize(Engine &engine, const uint8_t *wasm, size_t wasm_len) {
     wasmtime_module_t *ret = nullptr;
-    auto *error = wasmtime_module_deserialize(engine.ptr.get(), wasm.data(),
-                                              wasm.size(), &ret);
+    auto *error =
+        wasmtime_module_deserialize(engine.ptr.get(), wasm, wasm_len, &ret);
     if (error != nullptr) {
       return Error(error);
     }
@@ -1427,9 +1485,9 @@ public:
       return Error(error);
     }
     std::vector<uint8_t> ret;
-    // NOLINTNEXTLINE TODO can this be done without triggering lints?
-    std::span<uint8_t> raw(reinterpret_cast<uint8_t *>(bytes.data), bytes.size);
-    ret.assign(raw.begin(), raw.end());
+    // TODO can this be done without triggering lints?
+    const uint8_t *start = reinterpret_cast<uint8_t *>(bytes.data); // NOLINT
+    ret.assign(start, start + bytes.size);                          // NOLINT
     wasm_byte_vec_delete(&bytes);
     return ret;
   }
@@ -1919,6 +1977,37 @@ Store::Context::Context(Caller &caller)
     : Context(wasmtime_caller_context(caller.ptr)) {}
 Store::Context::Context(Caller *caller) : Context(*caller) {}
 
+/// \brief Small helper class used as the argument types for parameters/results
+/// in `Func` constructors. This class is a simple wrapper for a pointer and a
+/// length.
+template <typename T> class Span {
+  T *ptr;
+  size_t len;
+
+public:
+  /// \brief Creates a new span from the provided pointer/length.
+  Span(T *ptr, size_t len) : ptr(ptr), len(len) {}
+
+  /// \brief Type used to iterate over this span (a raw pointer)
+  typedef T *iterator;
+
+  /// \brief Pointer to the start of iteration for this span
+  iterator begin() const { return ptr; }
+  /// \brief Pointer to the end of iteration for this span
+  iterator end() const { return ptr + len; }
+  /// \brief Base pointer of this span
+  T *data() const { return ptr; }
+  /// \brief Unit length of this span, in units of `T`
+  size_t size() const { return len; }
+  /// \brief Gets the address of the `idx`th element in this `span`.
+  T *operator[](size_t idx) const { return &ptr[idx]; } // NOLINT
+
+#ifdef __cpp_lib_span
+  /// \brief Convert this span to a `std::span`
+  operator std::span<T>() { return {ptr, len}; }
+#endif
+};
+
 /**
  * \brief Representation of a WebAssembly function.
  *
@@ -1940,12 +2029,11 @@ class Func {
   static wasm_trap_t *raw_callback(void *env, wasmtime_caller_t *caller,
                                    const wasmtime_val_t *args, size_t nargs,
                                    wasmtime_val_t *results, size_t nresults) {
-    F *func = reinterpret_cast<F *>(env); // NOLINT
-    std::span<const Val> args_span(
-        reinterpret_cast<const Val *>(args), // NOLINT
-        nargs);
-    std::span<Val> results_span(reinterpret_cast<Val *>(results), // NOLINT
-                                nresults);
+    F *func = reinterpret_cast<F *>(env);                          // NOLINT
+    Span<const Val> args_span(reinterpret_cast<const Val *>(args), // NOLINT
+                              nargs);
+    Span<Val> results_span(reinterpret_cast<Val *>(results), // NOLINT
+                           nresults);
     Result<std::monostate, Trap> result =
         (*func)(Caller(caller), args_span, results_span);
     if (!result) {
@@ -2263,15 +2351,30 @@ public:
     return wasmtime_memory_size(cx.ptr, &memory);
   }
 
+#ifdef __cpp_lib_span
   /// Returns a `span` of where this memory is located in the host.
   ///
   /// Note that embedders need to be very careful in their usage of the returned
   /// `span`. It can be invalidated with calls to `grow` and/or calls into
   /// WebAssembly.
   std::span<uint8_t> data(Store::Context cx) const {
-    auto *base = wasmtime_memory_data(cx.ptr, &memory);
-    auto size = wasmtime_memory_data_size(cx.ptr, &memory);
-    return {base, size};
+    return {data_ptr(cx), data_size(cx)};
+  }
+#endif
+
+  /// Returns the base pointer in the host's memory of where this memory is
+  /// located.
+  ///
+  /// Note that embedders need to be very careful in their usage of the returned
+  /// pointer. It can be invalidated with calls to `grow` and/or calls into
+  /// WebAssembly.
+  uint8_t *data_ptr(Store::Context cx) const {
+    return wasmtime_memory_data(cx.ptr, &memory);
+  }
+
+  /// Returns size, in bytes, of this linear memory.
+  size_t data_size(Store::Context cx) const {
+    return wasmtime_memory_data_size(cx.ptr, &memory);
   }
 
   /// Grows the memory by `delta` WebAssembly pages.

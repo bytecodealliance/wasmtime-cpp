@@ -242,7 +242,7 @@ TEST(Memory, Smoke) {
   Memory m = unwrap(Memory::create(store, MemoryType(Limits(1))));
   EXPECT_EQ(m.size(store), 1);
   EXPECT_EQ(unwrap(m.grow(store, 1)), 1);
-  EXPECT_EQ(m.data(store).size(), 2 << 16);
+  EXPECT_EQ(m.data_size(store), 2 << 16);
   EXPECT_EQ(m.type(store)->limits().min(), 1);
 }
 

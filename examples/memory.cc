@@ -31,8 +31,8 @@ int main() {
 
   std::cout << "Checking memory...\n";
   assert(memory.size(store) == 2);
-  auto data = memory.data(store);
-  assert(data.size() == 0x20000);
+  auto *data = memory.data_ptr(store);
+  assert(memory.data_size(store) == 0x20000);
   assert(data[0] == 0);
   assert(data[0x1000] == 1);
   assert(data[0x1003] == 4);
@@ -45,13 +45,13 @@ int main() {
   load_fn.call(store, {0x20000}).err(); // out of bounds trap
 
   std::cout << "Mutating memory...\n";
-  memory.data(store)[0x1003] = 5;
+  memory.data_ptr(store)[0x1003] = 5;
 
   store_fn.call(store, {0x1002, 6}).unwrap();
   store_fn.call(store, {0x20000, 0}).err(); // out of bounds trap
 
-  assert(memory.data(store)[0x1002] == 6);
-  assert(memory.data(store)[0x1003] == 5);
+  assert(memory.data_ptr(store)[0x1002] == 6);
+  assert(memory.data_ptr(store)[0x1003] == 5);
   assert(load_fn.call(store, {0x1002}).unwrap()[0].i32() == 6);
   assert(load_fn.call(store, {0x1003}).unwrap()[0].i32() == 5);
 
@@ -59,7 +59,7 @@ int main() {
   std::cout << "Growing memory...\n";
   memory.grow(store, 1).unwrap();
   assert(memory.size(store) == 3);
-  assert(memory.data(store).size() == 0x30000);
+  assert(memory.data_size(store) == 0x30000);
 
   assert(load_fn.call(store, {0x20000}).unwrap()[0].i32() == 0);
   store_fn.call(store, {0x20000, 0}).unwrap();

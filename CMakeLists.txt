@@ -1,7 +1,14 @@
 cmake_minimum_required(VERSION 3.10)
 project(Wasmtime VERSION 0.27.0)
 
+option(CXX_STANDARD_20 "Use C++20" OFF)
+message(STATUS "CXX_STANDARD_20       ${CXX_STANDARD_20}")
+
+if (CXX_STANDARD_20)
 set(CMAKE_CXX_STANDARD 20)
+else()
+set(CMAKE_CXX_STANDARD 17)
+endif()
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 option(ENABLE_CODE_ANALYSIS "Run code analysis" OFF)
