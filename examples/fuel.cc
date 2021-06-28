@@ -24,15 +24,6 @@ to tweak the `-lpthread` and such annotations.
 
 using namespace wasmtime;
 
-template<typename T, typename E>
-T unwrap(Result<T, E> result) {
-  if (result) {
-    return result.ok();
-  }
-  std::cerr << "error: " << result.err().message() << "\n";
-  std::abort();
-}
-
 std::string readFile(const char* name) {
   std::ifstream watFile;
   watFile.open(name);
@@ -48,11 +39,11 @@ int main() {
   config.consume_fuel(true);
   Engine engine(std::move(config));
   Store store(engine);
-  unwrap(store.context().add_fuel(kStoreFuel));
+  store.context().add_fuel(kStoreFuel).unwrap();
 
   auto wat = readFile("examples/fuel.wat");
-  Module module = unwrap(Module::compile(engine, wat));
-  Instance instance = unwrap(Instance::create(store, module, {}));
+  Module module = Module::compile(engine, wat).unwrap();
+  Instance instance = Instance::create(store, module, {}).unwrap();
   Func fib = std::get<Func>(*instance.get(store, "fibonacci"));
 
   // Call it repeatedly until it fails
@@ -64,9 +55,9 @@ int main() {
       break;
     }
     uint64_t consumed = *store.context().fuel_consumed() - fuel_before;;
-    auto fib_result = unwrap(std::move(result))[0].i32();
+    auto fib_result = std::move(result).unwrap()[0].i32();
 
     std::cout << "fib(" << n << ") = " << fib_result << " [consumed " << consumed << " fuel]\n";
-    unwrap(store.context().add_fuel(consumed));
+    store.context().add_fuel(consumed).unwrap();
   }
 }
