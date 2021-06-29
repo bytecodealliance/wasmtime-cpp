@@ -44,7 +44,7 @@ into your project. Your C++ code will then use:
 Wasmtime supports Windows, macOS, and Linux. Wasmtime also supports the AArch64
 and x86\_64 architectures.
 
-The C++ header file here requires C++20 support, or the `-std=c++20` flag for
+The C++ header file here requires C++17 support, or the `-std=c++17` flag for
 unix compilers.
 
 ## Contributing
