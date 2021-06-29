@@ -48,14 +48,24 @@
 
 namespace wasmtime {
 
+#ifdef __cpp_lib_span
+
+/// \brief Alias to C++20 std::span when it is available
+template <typename T, std::size_t Extent = std::dynamic_extent>
+using Span = std::span<T, Extent>;
+
+#else
+
+/// \brief Means number of elements determined at runtime
+inline constexpr size_t dynamic_extent =
+    std::numeric_limits<std::size_t>::max();
+
 /**
  * \brief Span class used when c++20 is not available
  * @tparam T Type of data
  * @tparam Extent Static size of data refered by Span class
  */
-template <typename T,
-          std::size_t Extent = std::numeric_limits<std::size_t>::max()>
-class Span {
+template <typename T, std::size_t Extent = dynamic_extent> class Span {
 public:
   /// \brief Type used to iterate over this span (a raw pointer)
   using iterator = T *;
@@ -90,17 +100,12 @@ public:
   /// \brief Returns size in bytes
   std::size_t size_bytes() const { return sizeof(T) * size_; }
 
-#ifdef __cpp_lib_span
-  /// \brief Implicit conversion to std::span when C++20 defined
-  operator std::span<T, Extent>() const {
-    return std::span<T, Extent>(ptr_, size_);
-  }
-#endif
-
 private:
   T *ptr_;
   std::size_t size_;
 };
+
+#endif
 
 /**
  * \brief Errors coming from Wasmtime
