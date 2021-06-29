@@ -35,15 +35,72 @@
 #include <any>
 #include <initializer_list>
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <optional>
-#include <span>
 #include <variant>
 #include <vector>
+#ifdef __cpp_lib_span
+#include <span>
+#endif
 
 #include "wasmtime.h"
 
 namespace wasmtime {
+
+/**
+ * \brief Span class used when c++20 is not available
+ * @tparam T Type of data
+ * @tparam Extent Static size of data refered by Span class
+ */
+template <typename T,
+          std::size_t Extent = std::numeric_limits<std::size_t>::max()>
+class Span {
+public:
+  /// \brief Type used to iterate over this span (a raw pointer)
+  using iterator = T *;
+
+  /// \brief Constructor of Span class
+  Span(T *t, std::size_t n) : ptr_{t}, size_{n} {}
+
+  /// \brief Constructor of Span class for containers
+  template <template <typename, typename> class Container>
+  Span(Container<T, std::allocator<T>> &range)
+      : ptr_{range.data()}, size_{range.size()} {}
+
+  /// \brief Returns item by index
+  T &operator[](ptrdiff_t idx) const {
+    return ptr_[idx]; // NOLINT
+  }
+
+  /// \brief Returns pointer to data
+  T *data() const { return ptr_; }
+
+  /// \brief Returns number of data that referred by Span class
+  std::size_t size() const { return size_; }
+
+  /// \brief Returns begin iterator
+  iterator begin() const { return ptr_; }
+
+  /// \brief Returns end iterator
+  iterator end() const {
+    return ptr_ + size_; // NOLINT
+  }
+
+  /// \brief Returns size in bytes
+  std::size_t size_bytes() const { return sizeof(T) * size_; }
+
+#ifdef __cpp_lib_span
+  /// \brief Implicit conversion to std::span when C++20 defined
+  operator std::span<T, Extent>() const {
+    return std::span<T, Extent>(ptr_, size_);
+  }
+#endif
+
+private:
+  T *ptr_;
+  std::size_t size_;
+};
 
 /**
  * \brief Errors coming from Wasmtime
@@ -370,7 +427,7 @@ public:
   }
   std::vector<uint8_t> vec;
   // NOLINTNEXTLINE TODO can this be done without triggering lints?
-  std::span<uint8_t> raw(reinterpret_cast<uint8_t *>(ret.data), ret.size);
+  Span<uint8_t> raw(reinterpret_cast<uint8_t *>(ret.data), ret.size);
   vec.assign(raw.begin(), raw.end());
   wasm_byte_vec_delete(&ret);
   return vec;
@@ -387,10 +444,15 @@ class Limits {
 
 public:
   /// \brief Configures a minimum limit and no maximum limit.
-  explicit Limits(uint32_t min)
-      : raw({.min = min, .max = wasm_limits_max_default}) {}
+  explicit Limits(uint32_t min) : raw{} {
+    raw.min = min;
+    raw.max = wasm_limits_max_default;
+  }
   /// \brief Configures both a minimum and a maximum limit.
-  Limits(uint32_t min, uint32_t max) : raw({.min = min, .max = max}) {}
+  Limits(uint32_t min, uint32_t max) : raw{} {
+    raw.min = min;
+    raw.max = max;
+  }
   /// \brief Creates limits from the raw underlying C API.
   Limits(const wasm_limits_t *limits) : raw(*limits) {}
 
@@ -872,7 +934,10 @@ public:
 
   public:
     /// Creates an empty list
-    List() : list({.size = 0, .data = nullptr}) {}
+    List() : list{} {
+      list.size = 0;
+      list.data = nullptr;
+    }
     List(const List &other) = delete;
     /// Moves another list into this one.
     List(List &&other) noexcept : list(other.list) { other.list.size = 0; }
@@ -941,7 +1006,10 @@ public:
 
   public:
     /// Creates an empty list
-    List() : list({.size = 0, .data = nullptr}) {}
+    List() : list{} {
+      list.size = 0;
+      list.data = nullptr;
+    }
     List(const List &other) = delete;
     /// Moves another list into this one.
     List(List &&other) noexcept : list(other.list) { other.list.size = 0; }
@@ -1361,7 +1429,7 @@ public:
    * validate (or similar).
    */
   [[nodiscard]] static Result<Module> compile(Engine &engine,
-                                              std::span<uint8_t> wasm) {
+                                              Span<uint8_t> wasm) {
     wasmtime_module_t *ret = nullptr;
     auto *error =
         wasmtime_module_new(engine.ptr.get(), wasm.data(), wasm.size(), &ret);
@@ -1377,8 +1445,8 @@ public:
    * This function will validate whether the provided binary is indeed valid
    * within the compilation settings of the `engine` provided.
    */
-  [[nodiscard]] static Result<std::monostate>
-  validate(Engine &engine, std::span<uint8_t> wasm) {
+  [[nodiscard]] static Result<std::monostate> validate(Engine &engine,
+                                                       Span<uint8_t> wasm) {
     auto *error =
         wasmtime_module_validate(engine.ptr.get(), wasm.data(), wasm.size());
     if (error != nullptr) {
@@ -1400,7 +1468,7 @@ public:
    * https://docs.wasmtime.dev/api/wasmtime/struct.Module.html#method.deserialize
    */
   [[nodiscard]] static Result<Module> deserialize(Engine &engine,
-                                                  std::span<uint8_t> wasm) {
+                                                  Span<uint8_t> wasm) {
     wasmtime_module_t *ret = nullptr;
     auto *error = wasmtime_module_deserialize(engine.ptr.get(), wasm.data(),
                                               wasm.size(), &ret);
@@ -1428,7 +1496,7 @@ public:
     }
     std::vector<uint8_t> ret;
     // NOLINTNEXTLINE TODO can this be done without triggering lints?
-    std::span<uint8_t> raw(reinterpret_cast<uint8_t *>(bytes.data), bytes.size);
+    Span<uint8_t> raw(reinterpret_cast<uint8_t *>(bytes.data), bytes.size);
     ret.assign(raw.begin(), raw.end());
     wasm_byte_vec_delete(&bytes);
     return ret;
@@ -1742,21 +1810,37 @@ class Val {
 
   wasmtime_val_t val;
 
-  Val() : val({.kind = WASMTIME_I32, .of = {.i32 = 0}}) {}
+  Val() : val{} {
+    val.kind = WASMTIME_I32;
+    val.of.i32 = 0;
+  }
   Val(wasmtime_val_t val) : val(val) {}
 
 public:
   /// Creates a new `i32` WebAssembly value.
-  Val(int32_t i32) : val({.kind = WASMTIME_I32, .of = {.i32 = i32}}) {}
+  Val(int32_t i32) : val{} {
+    val.kind = WASMTIME_I32;
+    val.of.i32 = i32;
+  }
   /// Creates a new `i64` WebAssembly value.
-  Val(int64_t i64) : val({.kind = WASMTIME_I64, .of = {.i64 = i64}}) {}
+  Val(int64_t i64) : val{} {
+    val.kind = WASMTIME_I64;
+    val.of.i64 = i64;
+  }
   /// Creates a new `f32` WebAssembly value.
-  Val(float f32) : val({.kind = WASMTIME_F32, .of = {.f32 = f32}}) {}
+  Val(float f32) : val{} {
+    val.kind = WASMTIME_F32;
+    val.of.f32 = f32;
+  }
   /// Creates a new `f64` WebAssembly value.
-  Val(double f64) : val({.kind = WASMTIME_F64, .of = {.f64 = f64}}) {}
+  Val(double f64) : val{} {
+    val.kind = WASMTIME_F64;
+    val.of.f64 = f64;
+  }
   /// Creates a new `v128` WebAssembly value.
-  Val(const wasmtime_v128 &v128)
-      : val({.kind = WASMTIME_V128, .of = {.i32 = 0}}) {
+  Val(const wasmtime_v128 &v128) : val{} {
+    val.kind = WASMTIME_V128;
+    val.of.i32 = 0;
     memcpy(&val.of.v128[0], &v128[0], sizeof(wasmtime_v128));
   }
   /// Creates a new `funcref` WebAssembly value.
@@ -1764,8 +1848,9 @@ public:
   /// Creates a new `funcref` WebAssembly value which is not `ref.null func`.
   Val(Func func);
   /// Creates a new `externref` value.
-  Val(std::optional<ExternRef> ptr)
-      : val({.kind = WASMTIME_EXTERNREF, .of = {.externref = nullptr}}) {
+  Val(std::optional<ExternRef> ptr) : val{} {
+    val.kind = WASMTIME_EXTERNREF;
+    val.of.externref = nullptr;
     if (ptr) {
       val.of.externref = ptr->ptr.release();
     }
@@ -1774,11 +1859,15 @@ public:
   /// extern`.
   Val(ExternRef ptr);
   /// Copies the contents of another value into this one.
-  Val(const Val &other) : val({.kind = WASMTIME_I32, .of = {.i32 = 0}}) {
+  Val(const Val &other) : val{} {
+    val.kind = WASMTIME_I32;
+    val.of.i32 = 0;
     wasmtime_val_copy(&val, &other.val);
   }
   /// Moves the resources from another value into this one.
-  Val(Val &&other) noexcept : val({.kind = WASMTIME_I32, .of = {.i32 = 0}}) {
+  Val(Val &&other) noexcept : val{} {
+    val.kind = WASMTIME_I32;
+    val.of.i32 = 0;
     std::swap(val, other.val);
   }
 
@@ -1940,12 +2029,11 @@ class Func {
   static wasm_trap_t *raw_callback(void *env, wasmtime_caller_t *caller,
                                    const wasmtime_val_t *args, size_t nargs,
                                    wasmtime_val_t *results, size_t nresults) {
-    F *func = reinterpret_cast<F *>(env); // NOLINT
-    std::span<const Val> args_span(
-        reinterpret_cast<const Val *>(args), // NOLINT
-        nargs);
-    std::span<Val> results_span(reinterpret_cast<Val *>(results), // NOLINT
-                                nresults);
+    F *func = reinterpret_cast<F *>(env);                          // NOLINT
+    Span<const Val> args_span(reinterpret_cast<const Val *>(args), // NOLINT
+                              nargs);
+    Span<Val> results_span(reinterpret_cast<Val *>(results), // NOLINT
+                           nresults);
     Result<std::monostate, Trap> result =
         (*func)(Caller(caller), args_span, results_span);
     if (!result) {
@@ -1978,10 +2066,10 @@ public:
    *
    * * The first parameter is a `Caller` to get recursive access to the store
    *   and other caller state.
-   * * The second parameter is a `std::span<const Val>` which is the list of
+   * * The second parameter is a `Span<const Val>` which is the list of
    *   parameters to the function. These parameters are guaranteed to be of the
    *   types specified by `ty` when constructing this function.
-   * * The last argument is `std::span<Val>` which is where to write the return
+   * * The last argument is `Span<Val>` which is where to write the return
    *   values of the function. The function must produce the types of values
    *   specified by `ty` or otherwise a trap will be raised.
    *
@@ -2047,9 +2135,10 @@ public:
   }
 };
 
-Val::Val(std::optional<Func> func)
-    : val({.kind = WASMTIME_FUNCREF,
-           .of = {.funcref = {.store_id = 0, .index = 0}}}) {
+Val::Val(std::optional<Func> func) : val{} {
+  val.kind = WASMTIME_FUNCREF;
+  val.of.funcref.store_id = 0;
+  val.of.funcref.index = 0;
   if (func) {
     val.of.funcref = (*func).func;
   }
@@ -2268,7 +2357,7 @@ public:
   /// Note that embedders need to be very careful in their usage of the returned
   /// `span`. It can be invalidated with calls to `grow` and/or calls into
   /// WebAssembly.
-  std::span<uint8_t> data(Store::Context cx) const {
+  Span<uint8_t> data(Store::Context cx) const {
     auto *base = wasmtime_memory_data(cx.ptr, &memory);
     auto size = wasmtime_memory_data_size(cx.ptr, &memory);
     return {base, size};
