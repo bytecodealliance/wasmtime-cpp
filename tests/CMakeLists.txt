@@ -10,12 +10,17 @@ FetchContent_MakeAvailable(googletest)
 include(GoogleTest)
 
 function(add_test name)
-
   add_executable(test-${name} ${name}.cc)
   target_link_libraries(test-${name} PRIVATE wasmtime-cpp gtest_main)
-
   gtest_discover_tests(test-${name})
 endfunction()
 
 add_test(simple)
 add_test(types)
+
+# Add a custom test where two files include `wasmtime.hh` and are compiled into
+# the same executable (basically makes sure any defined functions in the header
+# are tagged with `inline`).
+add_executable(test-double-include double-include-a.cc double-include-b.cc)
+target_link_libraries(test-double-include PRIVATE wasmtime-cpp gtest_main)
+gtest_discover_tests(test-double-include)

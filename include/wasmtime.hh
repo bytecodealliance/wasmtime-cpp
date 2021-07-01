@@ -133,7 +133,7 @@ public:
 };
 
 /// \brief Used to print an error.
-std::ostream &operator<<(std::ostream &os, const Error &e) {
+inline std::ostream &operator<<(std::ostream &os, const Error &e) {
   os << e.message();
   return os;
 }
@@ -424,7 +424,8 @@ public:
  *
  * Returns either an error if parsing failed or the wasm binary.
  */
-[[nodiscard]] Result<std::vector<uint8_t>> wat2wasm(std::string_view wat) {
+[[nodiscard]] inline Result<std::vector<uint8_t>>
+wat2wasm(std::string_view wat) {
   wasm_byte_vec_t ret;
   auto *error = wasmtime_wat2wasm(wat.data(), wat.size(), &ret);
   if (error != nullptr) {
@@ -2009,9 +2010,9 @@ public:
   Store::Context context() { return this; }
 };
 
-Store::Context::Context(Caller &caller)
+inline Store::Context::Context(Caller &caller)
     : Context(wasmtime_caller_context(caller.ptr)) {}
-Store::Context::Context(Caller *caller) : Context(*caller) {}
+inline Store::Context::Context(Caller *caller) : Context(*caller) {}
 
 /**
  * \brief Representation of a WebAssembly function.
@@ -2140,7 +2141,7 @@ public:
   }
 };
 
-Val::Val(std::optional<Func> func) : val{} {
+inline Val::Val(std::optional<Func> func) : val{} {
   val.kind = WASMTIME_FUNCREF;
   val.of.funcref.store_id = 0;
   val.of.funcref.index = 0;
@@ -2149,10 +2150,10 @@ Val::Val(std::optional<Func> func) : val{} {
   }
 }
 
-Val::Val(Func func) : Val(std::optional(func)) {}
-Val::Val(ExternRef ptr) : Val(std::optional(ptr)) {}
+inline Val::Val(Func func) : Val(std::optional(func)) {}
+inline Val::Val(ExternRef ptr) : Val(std::optional(ptr)) {}
 
-std::optional<Func> Val::funcref() const {
+inline std::optional<Func> Val::funcref() const {
   if (val.kind != WASMTIME_FUNCREF) {
     std::abort();
   }
@@ -2527,7 +2528,7 @@ public:
   }
 };
 
-std::optional<Extern> Caller::get_export(std::string_view name) {
+inline std::optional<Extern> Caller::get_export(std::string_view name) {
   wasmtime_extern_t item;
   if (wasmtime_caller_export_get(ptr, name.data(), name.size(), &item)) {
     return Instance::cvt(item);
