@@ -12,16 +12,6 @@ T unwrap(Result<T, E> result) {
   std::abort();
 }
 
-TEST(Limits, Smoke) {
-  Limits limits(1);
-  EXPECT_EQ(limits.min(), 1);
-  EXPECT_EQ(limits.max(), std::nullopt);
-
-  limits = Limits(2, 3);
-  EXPECT_EQ(limits.min(), 2);
-  EXPECT_EQ(limits.max(), 3);
-}
-
 TEST(ValType, Smoke) {
   EXPECT_EQ(ValType(ValKind::I32)->kind(), ValKind::I32);
   EXPECT_EQ(ValType(ValKind::I64)->kind(), ValKind::I64);
@@ -42,19 +32,19 @@ TEST(ValType, Smoke) {
 }
 
 TEST(MemoryType, Smoke) {
-  MemoryType t(Limits(1));
+  MemoryType t(1);
 
-  EXPECT_EQ(t->limits().min(), 1);
-  EXPECT_EQ(t->limits().max(), std::nullopt);
+  EXPECT_EQ(t->min(), 1);
+  EXPECT_EQ(t->max(), std::nullopt);
   MemoryType t2 = t;
   t2 = t;
 }
 
 TEST(TableType, Smoke) {
-  TableType t(ValKind::FuncRef, Limits(1));
+  TableType t(ValKind::FuncRef, 1);
 
-  EXPECT_EQ(t->limits().min(), 1);
-  EXPECT_EQ(t->limits().max(), std::nullopt);
+  EXPECT_EQ(t->min(), 1);
+  EXPECT_EQ(t->max(), std::nullopt);
   EXPECT_EQ(t->element().kind(), ValKind::FuncRef);
 
   TableType t2 = t;
@@ -158,4 +148,18 @@ TEST(InstanceType, Smoke) {
   auto export_ty = std::get<GlobalType::Ref>(ExternType::from_export(e));
   EXPECT_EQ(export_ty.content().kind(), ValKind::I32);
   EXPECT_FALSE(export_ty.is_mutable());
+}
+
+TEST(MemoryType, SixtyFour) {
+  MemoryType t(1);
+  EXPECT_FALSE(t->is_64());
+  t = MemoryType::New64(1);
+  EXPECT_TRUE(t->is_64());
+  EXPECT_EQ(t->min(), 1);
+  EXPECT_EQ(t->max(), std::nullopt);
+
+  t = MemoryType::New64(0x100000000, 0x100000001);
+  EXPECT_TRUE(t->is_64());
+  EXPECT_EQ(t->min(), 0x100000000);
+  EXPECT_EQ(t->max(), 0x100000001);
 }

@@ -220,10 +220,10 @@ TEST(Global, Smoke) {
 TEST(Table, Smoke) {
   Engine engine;
   Store store(engine);
-  Table::create(store, TableType(ValKind::I32, Limits(1)), 3.0).err();
+  Table::create(store, TableType(ValKind::I32, 1), 3.0).err();
 
   Val null = std::optional<Func>();
-  Table t = unwrap(Table::create(store, TableType(ValKind::FuncRef, Limits(1)), null));
+  Table t = unwrap(Table::create(store, TableType(ValKind::FuncRef, 1), null));
   EXPECT_FALSE(t.get(store, 1));
   EXPECT_TRUE(t.get(store, 0));
   Val val = *t.get(store, 0);
@@ -239,19 +239,19 @@ TEST(Table, Smoke) {
 TEST(Memory, Smoke) {
   Engine engine;
   Store store(engine);
-  Memory m = unwrap(Memory::create(store, MemoryType(Limits(1))));
+  Memory m = unwrap(Memory::create(store, MemoryType(1)));
   EXPECT_EQ(m.size(store), 1);
   EXPECT_EQ(unwrap(m.grow(store, 1)), 1);
   EXPECT_EQ(m.data(store).size(), 2 << 16);
-  EXPECT_EQ(m.type(store)->limits().min(), 1);
+  EXPECT_EQ(m.type(store)->min(), 1);
 }
 
 TEST(Instance, Smoke) {
   Engine engine;
   Store store(engine);
-  Memory m = unwrap(Memory::create(store, MemoryType(Limits(1))));
+  Memory m = unwrap(Memory::create(store, MemoryType(1)));
   Global g = unwrap(Global::create(store, GlobalType(ValKind::I32, false), 1));
-  Table t = unwrap(Table::create(store, TableType(ValKind::FuncRef, Limits(1)), std::optional<Func>()));
+  Table t = unwrap(Table::create(store, TableType(ValKind::FuncRef, 1), std::optional<Func>()));
   Func f(store, FuncType({}, {}), [](auto caller, auto params, auto results) -> auto {
     return std::monostate();
   });
@@ -323,7 +323,7 @@ TEST(Caller, Smoke) {
     EXPECT_TRUE(caller.get_export("m"));
     EXPECT_TRUE(caller.get_export("f"));
     Memory m = std::get<Memory>(*caller.get_export("m"));
-    EXPECT_EQ(m.type(caller)->limits().min(), 1);
+    EXPECT_EQ(m.type(caller)->min(), 1);
     return std::monostate();
   });
   Instance i = unwrap(Instance::create(store, m, {f2}));
