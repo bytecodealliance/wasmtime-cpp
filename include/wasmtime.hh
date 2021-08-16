@@ -620,8 +620,9 @@ public:
     std::optional<uint64_t> max() const {
       uint64_t max = 0;
       auto present = wasmtime_memorytype_maximum(ptr, &max);
-      if (present)
+      if (present) {
         return max;
+      }
       return std::nullopt;
     }
 
@@ -710,7 +711,7 @@ public:
 
     /// Returns the maximum size of this table type, in elements, if present.
     std::optional<uint32_t> max() const {
-      auto *limits = wasm_tabletype_limits(ptr);
+      const auto *limits = wasm_tabletype_limits(ptr);
       if (limits->max == wasm_limits_max_default) {
         return std::nullopt;
       }
