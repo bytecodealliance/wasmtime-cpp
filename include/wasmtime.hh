@@ -439,41 +439,6 @@ wat2wasm(std::string_view wat) {
   return vec;
 }
 
-/**
- * \brief Min/max limits used for `MemoryType` and `TableType`
- */
-class Limits {
-  friend class MemoryType;
-  friend class TableType;
-
-  wasm_limits_t raw;
-
-public:
-  /// \brief Configures a minimum limit and no maximum limit.
-  explicit Limits(uint32_t min) : raw{} {
-    raw.min = min;
-    raw.max = wasm_limits_max_default;
-  }
-  /// \brief Configures both a minimum and a maximum limit.
-  Limits(uint32_t min, uint32_t max) : raw{} {
-    raw.min = min;
-    raw.max = max;
-  }
-  /// \brief Creates limits from the raw underlying C API.
-  Limits(const wasm_limits_t *limits) : raw(*limits) {}
-
-  /// \brief Returns the minimum size specified by these limits.
-  uint32_t min() const { return raw.min; }
-
-  /// \brief Returns optional maximum limit configured.
-  std::optional<uint32_t> max() const {
-    if (raw.max == wasm_limits_max_default) {
-      return std::nullopt;
-    }
-    return raw.max;
-  }
-};
-
 /// Different kinds of types accepted by Wasmtime.
 enum class ValKind {
   /// WebAssembly's `i32` type
@@ -647,9 +612,21 @@ public:
     /// Creates a reference from an original `MemoryType`.
     Ref(const MemoryType &ty) : Ref(ty.ptr.get()) {}
 
-    /// Returns the underlying limits on this wasm memory type, specified in
-    /// units of wasm pages.
-    Limits limits() const { return Limits(wasm_memorytype_limits(ptr)); }
+    /// Returns the minimum size, in WebAssembly pages, of this memory.
+    uint64_t min() const { return wasmtime_memorytype_minimum(ptr); }
+
+    /// Returns the maximum size, in WebAssembly pages, of this memory, if
+    /// specified.
+    std::optional<uint64_t> max() const {
+      uint64_t max = 0;
+      auto present = wasmtime_memorytype_maximum(ptr, &max);
+      if (present)
+        return max;
+      return std::nullopt;
+    }
+
+    /// Returns whether or not this is a 64-bit memory type.
+    bool is_64() const { return wasmtime_memorytype_is64(ptr); }
   };
 
 private:
@@ -657,9 +634,26 @@ private:
   MemoryType(wasm_memorytype_t *ptr) : ptr(ptr), ref(ptr) {}
 
 public:
-  /// Creates a new wasm memory from the specified limits.
-  explicit MemoryType(const Limits &limits)
-      : MemoryType(wasm_memorytype_new(&limits.raw)) {}
+  /// Creates a new 32-bit wasm memory type with the specified minimum number of
+  /// pages for the minimum size. The created type will have no maximum memory
+  /// size.
+  explicit MemoryType(uint32_t min)
+      : MemoryType(wasmtime_memorytype_new(min, false, 0, false)) {}
+  /// Creates a new 32-bit wasm memory type with the specified minimum number of
+  /// pages for the minimum size, and maximum number of pages for the max size.
+  MemoryType(uint32_t min, uint32_t max)
+      : MemoryType(wasmtime_memorytype_new(min, true, max, false)) {}
+
+  /// Same as the `MemoryType` constructor, except creates a 64-bit memory.
+  static MemoryType New64(uint64_t min) {
+    return MemoryType(wasmtime_memorytype_new(min, false, 0, true));
+  }
+
+  /// Same as the `MemoryType` constructor, except creates a 64-bit memory.
+  static MemoryType New64(uint64_t min, uint64_t max) {
+    return MemoryType(wasmtime_memorytype_new(min, true, max, true));
+  }
+
   /// Creates a new wasm memory type from the specified ref, making a fresh
   /// owned value.
   MemoryType(Ref other) : MemoryType(wasm_memorytype_copy(other.ptr)) {}
@@ -711,8 +705,17 @@ public:
     /// Creates a reference to the provided `TableType`.
     Ref(const TableType &ty) : Ref(ty.ptr.get()) {}
 
-    /// Returns the limits, in units of elements, of this table.
-    Limits limits() const { return wasm_tabletype_limits(ptr); }
+    /// Returns the minimum size of this table type, in elements.
+    uint32_t min() const { return wasm_tabletype_limits(ptr)->min; }
+
+    /// Returns the maximum size of this table type, in elements, if present.
+    std::optional<uint32_t> max() const {
+      auto *limits = wasm_tabletype_limits(ptr);
+      if (limits->max == wasm_limits_max_default) {
+        return std::nullopt;
+      }
+      return limits->max;
+    }
 
     /// Returns the type of value that is stored in this table.
     ValType::Ref element() const { return wasm_tabletype_element(ptr); }
@@ -723,9 +726,24 @@ private:
   TableType(wasm_tabletype_t *ptr) : ptr(ptr), ref(ptr) {}
 
 public:
-  /// Creates a new table type from the specified value type and limits.
-  TableType(ValType ty, Limits limits)
-      : TableType(wasm_tabletype_new(ty.ptr.release(), &limits.raw)) {}
+  /// Creates a new table type from the specified value type and minimum size.
+  /// The returned table will have no maximum size.
+  TableType(ValType ty, uint32_t min) : ptr(nullptr), ref(nullptr) {
+    wasm_limits_t limits;
+    limits.min = min;
+    limits.max = wasm_limits_max_default;
+    ptr.reset(wasm_tabletype_new(ty.ptr.release(), &limits));
+    ref = ptr.get();
+  }
+  /// Creates a new table type from the specified value type, minimum size, and
+  /// maximum size.
+  TableType(ValType ty, uint32_t min, uint32_t max) : ptr(nullptr), ref(nullptr) {
+    wasm_limits_t limits;
+    limits.min = min;
+    limits.max = max;
+    ptr.reset(wasm_tabletype_new(ty.ptr.release(), &limits));
+    ref = ptr.get();
+  }
   /// Clones the given reference into a new table type.
   TableType(Ref other) : TableType(wasm_tabletype_copy(other.ptr)) {}
   /// Copies another table type into this one.
@@ -2360,7 +2378,7 @@ public:
   }
 
   /// Returns the size, in WebAssembly pages, of this memory.
-  uint32_t size(Store::Context cx) const {
+  uint64_t size(Store::Context cx) const {
     return wasmtime_memory_size(cx.ptr, &memory);
   }
 
@@ -2379,8 +2397,8 @@ public:
   ///
   /// On success returns the previous size of this memory in units of
   /// WebAssembly pages.
-  [[nodiscard]] Result<uint32_t> grow(Store::Context cx, uint32_t delta) const {
-    uint32_t prev = 0;
+  [[nodiscard]] Result<uint64_t> grow(Store::Context cx, uint64_t delta) const {
+    uint64_t prev = 0;
     auto *error = wasmtime_memory_grow(cx.ptr, &memory, delta, &prev);
     if (error != nullptr) {
       return Error(error);
