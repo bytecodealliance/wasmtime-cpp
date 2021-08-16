@@ -738,7 +738,8 @@ public:
   }
   /// Creates a new table type from the specified value type, minimum size, and
   /// maximum size.
-  TableType(ValType ty, uint32_t min, uint32_t max) : ptr(nullptr), ref(nullptr) {
+  TableType(ValType ty, uint32_t min, uint32_t max)
+      : ptr(nullptr), ref(nullptr) {
     wasm_limits_t limits;
     limits.min = min;
     limits.max = max;
