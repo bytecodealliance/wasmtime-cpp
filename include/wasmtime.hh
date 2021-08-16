@@ -524,6 +524,8 @@ class ValType {
       return WASM_FUNCREF;
     case ValKind::V128:
       return WASMTIME_V128;
+    default:
+      abort();
     }
   }
 
@@ -2208,11 +2210,7 @@ public:
   }
 
   /// Returns the current value of this global.
-  Val get(Store::Context cx) const {
-    Val val;
-    wasmtime_global_get(cx.ptr, &global, &val.val);
-    return val;
-  }
+  Val get(Store::Context cx) const;
 
   /// Sets this global to a new value.
   ///
@@ -2317,6 +2315,14 @@ public:
     return prev;
   }
 };
+
+// gcc 8.3.0 seems to require that this comes after the definition of `Table`. I
+// don't know why...
+inline Val Global::get(Store::Context cx) const {
+  Val val;
+  wasmtime_global_get(cx.ptr, &global, &val.val);
+  return val;
+}
 
 /**
  * \brief A WebAssembly linear memory.
