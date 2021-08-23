@@ -1789,15 +1789,13 @@ public:
   /// Note that `val` should be safe to send across threads and should own any
   /// memory that it points to. Also note that `ExternRef` is similar to a
   /// `std::shared_ptr` in that there can be many references to the same value.
+  explicit ExternRef(std::any val)
+      : ExternRef(wasmtime_externref_new(
+            std::make_unique<std::any>(std::move(val)).release(), finalizer)) {}
   /// Performs a shallow copy of another `externref` value, creating another
   /// reference to it.
   ExternRef(const ExternRef &other)
       : ExternRef(wasmtime_externref_clone(other.ptr.get())) {}
-
-  template <class T>
-  explicit ExternRef(T val)
-      : ExternRef(wasmtime_externref_new(
-            std::make_unique<std::any>(std::move(val)).release(), finalizer)) {}
   /// Performs a shallow copy of another `externref` value, creating another
   /// reference to it.
   ExternRef &operator=(const ExternRef &other) {
