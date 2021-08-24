@@ -1381,10 +1381,10 @@ struct TrapError {
 
   /// Dispatches internally to return the message associated with this error.
   std::string message() const {
-    if (auto *trap = std::get_if<Trap>(&data)) {
+    if (const auto *trap = std::get_if<Trap>(&data)) {
       return trap->message();
     }
-    if (auto *error = std::get_if<Error>(&data)) {
+    if (const auto *error = std::get_if<Error>(&data)) {
       return std::string(error->message());
     }
     std::abort();
