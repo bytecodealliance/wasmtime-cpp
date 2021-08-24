@@ -1380,7 +1380,7 @@ struct TrapError {
   TrapError(Error e) : data(std::move(e)) {}
 
   /// Dispatches internally to return the message associated with this error.
-  std::string message() {
+  std::string message() const {
     if (auto *trap = std::get_if<Trap>(&data)) {
       return trap->message();
     }
@@ -1725,6 +1725,16 @@ public:
         return fuel;
       }
       return std::nullopt;
+    }
+
+    /// Set user specified data associated with this store.
+    void set_data(void* data) const {
+      wasmtime_context_set_data(ptr, data);
+    }
+
+    /// Get user specified data associated with this store.
+    void* get_data() const {
+      return wasmtime_context_get_data(ptr);
     }
 
     /// Configures the WASI state used by this store.

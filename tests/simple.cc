@@ -344,3 +344,18 @@ TEST(Func, Smoke) {
   });
   EXPECT_EQ(f2.call(store, {}).err().message(), "message");
 }
+
+TEST(Data, Smoke) {
+  int32_t data = 10;
+  Engine engine;
+  Store store(engine);
+  store.context().set_data(&data);
+  Func f(store, FuncType({}, {}), [](auto caller, auto params, auto results) -> Result<std::monostate,Trap> {
+    int32_t data = *static_cast<int32_t*>(caller.context().get_data());
+    if (data != 10) {
+      return Trap("message");
+    }
+    return std::monostate();
+  });
+  unwrap(f.call(store, {}));
+}
