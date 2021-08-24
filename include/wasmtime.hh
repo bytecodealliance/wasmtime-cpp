@@ -1661,10 +1661,14 @@ class Store {
 
   std::unique_ptr<wasmtime_store_t, deleter> ptr;
 
+  static void finalizer(void *ptr) {
+    std::unique_ptr<std::any> _ptr(static_cast<std::any *>(ptr));
+  }
+
 public:
   /// Creates a new `Store` within the provided `Engine`.
-  explicit Store(Engine &engine)
-      : ptr(wasmtime_store_new(engine.ptr.get(), nullptr, nullptr)) {}
+  explicit Store(Engine &engine, void(f)(void*) = finalizer)
+      : ptr(wasmtime_store_new(engine.ptr.get(), nullptr, f)) {}
 
   /**
    * \brief An interior pointer into a `Store`.
@@ -1728,10 +1732,12 @@ public:
     }
 
     /// Set user specified data associated with this store.
-    void set_data(void *data) const { wasmtime_context_set_data(ptr, data); }
+    void set_data(std::any val) const {
+      wasmtime_context_set_data(ptr, std::make_unique<std::any>(std::move(val)).release());
+    }
 
     /// Get user specified data associated with this store.
-    void *get_data() const { return wasmtime_context_get_data(ptr); }
+    std::any &get_data() const { return *static_cast<std::any *>(wasmtime_context_get_data(ptr)); }
 
     /// Configures the WASI state used by this store.
     ///
