@@ -1728,14 +1728,10 @@ public:
     }
 
     /// Set user specified data associated with this store.
-    void set_data(void *data) const {
-      wasmtime_context_set_data(ptr, data);
-    }
+    void set_data(void *data) const { wasmtime_context_set_data(ptr, data); }
 
     /// Get user specified data associated with this store.
-    void *get_data() const {
-      return wasmtime_context_get_data(ptr);
-    }
+    void *get_data() const { return wasmtime_context_get_data(ptr); }
 
     /// Configures the WASI state used by this store.
     ///
