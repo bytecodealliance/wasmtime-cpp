@@ -1667,7 +1667,7 @@ class Store {
 
 public:
   /// Creates a new `Store` within the provided `Engine`.
-  explicit Store(Engine &engine, void(f)(void*) = finalizer)
+  explicit Store(Engine &engine, void(f)(void *) = finalizer)
       : ptr(wasmtime_store_new(engine.ptr.get(), nullptr, f)) {}
 
   /**
@@ -1733,11 +1733,14 @@ public:
 
     /// Set user specified data associated with this store.
     void set_data(std::any val) const {
-      wasmtime_context_set_data(ptr, std::make_unique<std::any>(std::move(val)).release());
+      wasmtime_context_set_data(
+           ptr, std::make_unique<std::any>(std::move(val)).release());
     }
 
     /// Get user specified data associated with this store.
-    std::any &get_data() const { return *static_cast<std::any *>(wasmtime_context_get_data(ptr)); }
+    std::any &get_data() const {
+      return *static_cast<std::any *>(wasmtime_context_get_data(ptr));
+    }
 
     /// Configures the WASI state used by this store.
     ///
