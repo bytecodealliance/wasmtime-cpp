@@ -1734,8 +1734,8 @@ public:
     /// Set user specified data associated with this store.
     void set_data(std::any data) const {
       finalizer(static_cast<std::any *>(wasmtime_context_get_data(ptr)));
-      wasmtime_context_set_data(ptr,
-                                std::make_unique<std::any>(std::move(data)).release());
+      wasmtime_context_set_data(
+          ptr, std::make_unique<std::any>(std::move(data)).release());
     }
 
     /// Get user specified data associated with this store.
