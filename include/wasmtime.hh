@@ -1728,12 +1728,12 @@ public:
     }
 
     /// Set user specified data associated with this store.
-    void set_data(void* data) const {
+    void set_data(void *data) const {
       wasmtime_context_set_data(ptr, data);
     }
 
     /// Get user specified data associated with this store.
-    void* get_data() const {
+    void *get_data() const {
       return wasmtime_context_get_data(ptr);
     }
 
