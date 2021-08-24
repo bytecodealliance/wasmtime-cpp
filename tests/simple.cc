@@ -382,7 +382,7 @@ TEST(Data, Smoke) {
   struct test_object {
     test_object() : v(nullptr) {}
     test_object(int i) : v(new int(i)) {}
-    test_object(const test_object &other) : v((other.v) ? new int *other.v : nullptr)) {}
+    test_object(const test_object &other) : v((other.v) ? new int(*other.v) : nullptr) {}
     test_object(test_object &&other) : v(other.v) { other.v = nullptr; }
     ~test_object() { if (v) { delete v; v = nullptr; } }
     int* v;

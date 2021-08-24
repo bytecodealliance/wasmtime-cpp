@@ -1667,8 +1667,8 @@ class Store {
 
 public:
   /// Creates a new `Store` within the provided `Engine`.
-  explicit Store(Engine &engine, void(f)(void *) = finalizer)
-      : ptr(wasmtime_store_new(engine.ptr.get(), nullptr, f)) {}
+  explicit Store(Engine &engine)
+      : ptr(wasmtime_store_new(engine.ptr.get(), nullptr, finalizer)) {}
 
   /**
    * \brief An interior pointer into a `Store`.
@@ -1732,9 +1732,9 @@ public:
     }
 
     /// Set user specified data associated with this store.
-    void set_data(std::any val) const {
-      wasmtime_context_set_data(
-           ptr, std::make_unique<std::any>(std::move(val)).release());
+    void set_data(std::any data) const {
+      finalizer(static_cast<std::any *>(wasmtime_context_get_data(ptr)));
+      wasmtime_context_set_data(ptr, std::make_unique<std::any>(std::move(data)).release());
     }
 
     /// Get user specified data associated with this store.
