@@ -1380,11 +1380,11 @@ struct TrapError {
   TrapError(Error e) : data(std::move(e)) {}
 
   /// Dispatches internally to return the message associated with this error.
-  std::string message() {
-    if (auto *trap = std::get_if<Trap>(&data)) {
+  std::string message() const {
+    if (const auto *trap = std::get_if<Trap>(&data)) {
       return trap->message();
     }
-    if (auto *error = std::get_if<Error>(&data)) {
+    if (const auto *error = std::get_if<Error>(&data)) {
       return std::string(error->message());
     }
     std::abort();
@@ -1661,10 +1661,14 @@ class Store {
 
   std::unique_ptr<wasmtime_store_t, deleter> ptr;
 
+  static void finalizer(void *ptr) {
+    std::unique_ptr<std::any> _ptr(static_cast<std::any *>(ptr));
+  }
+
 public:
   /// Creates a new `Store` within the provided `Engine`.
   explicit Store(Engine &engine)
-      : ptr(wasmtime_store_new(engine.ptr.get(), nullptr, nullptr)) {}
+      : ptr(wasmtime_store_new(engine.ptr.get(), nullptr, finalizer)) {}
 
   /**
    * \brief An interior pointer into a `Store`.
@@ -1725,6 +1729,18 @@ public:
         return fuel;
       }
       return std::nullopt;
+    }
+
+    /// Set user specified data associated with this store.
+    void set_data(std::any data) const {
+      finalizer(static_cast<std::any *>(wasmtime_context_get_data(ptr)));
+      wasmtime_context_set_data(
+          ptr, std::make_unique<std::any>(std::move(data)).release());
+    }
+
+    /// Get user specified data associated with this store.
+    std::any &get_data() const {
+      return *static_cast<std::any *>(wasmtime_context_get_data(ptr));
     }
 
     /// Configures the WASI state used by this store.
