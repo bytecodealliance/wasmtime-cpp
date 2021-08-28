@@ -843,6 +843,7 @@ public:
  */
 class FuncType {
   friend class Func;
+  friend class Linker;
 
   struct deleter {
     void operator()(wasm_functype_t *p) const { wasm_functype_delete(p); }
@@ -2067,6 +2068,7 @@ inline Store::Context::Context(Caller *caller) : Context(*caller) {}
 class Func {
   friend class Val;
   friend class Instance;
+  friend class Linker;
 
   wasmtime_func_t func;
 
@@ -2682,6 +2684,24 @@ public:
       return Instance::cvt(item);
     }
     return std::nullopt;
+  }
+
+  /// Defines a new function in this linker
+  template <typename F>
+  [[nodiscard]] Result<std::monostate> define_func(std::string_view module,
+                                                   std::string_view name,
+                                                   const FuncType &ty, F f) {
+
+    auto *error = wasmtime_linker_define_func(
+        ptr.get(), module.data(), module.length(), name.data(), name.length(),
+        ty.ptr.get(), Func::raw_callback<F>, std::make_unique<F>(f).release(),
+        Func::raw_finalize<F>);
+
+    if (error != nullptr) {
+      return Error(error);
+    }
+
+    return std::monostate();
   }
 
   /// Loads the "default" function, according to WASI commands and reactors, of
