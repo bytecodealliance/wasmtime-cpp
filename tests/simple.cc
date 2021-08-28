@@ -294,7 +294,11 @@ TEST(Linker, Smoke) {
   Global g = unwrap(Global::create(store, GlobalType(ValKind::I32, false), 1));
   unwrap(linker.define("a", "g", g));
   unwrap(linker.define_wasi());
-
+  unwrap(linker.define_func(
+      "a", "f", FuncType({}, {}),
+      [](auto caller, auto params, auto results) -> auto {
+        return std::monostate();
+      }));
   Module mod = unwrap(Module::compile(engine, "(module)"));
   Instance i = unwrap(Instance::create(store, mod, {}));
   unwrap(linker.define_instance(store, "x", i));
@@ -302,6 +306,8 @@ TEST(Linker, Smoke) {
   unwrap(linker.module(store, "y", mod));
   EXPECT_TRUE(linker.get(store, "a", "g"));
   unwrap(linker.get_default(store, "g"));
+  EXPECT_TRUE(linker.get(store, "a", "f"));
+  EXPECT_TRUE(std::holds_alternative<Func>(*linker.get(store, "a", "f")));
 }
 
 TEST(Caller, Smoke) {
