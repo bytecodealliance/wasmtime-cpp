@@ -31,16 +31,10 @@ int main() {
 
   // Our wasm module we'll be instantiating requires one imported function.
   // the function takes no parameters and returns no results. We create a host
-  // implementation of that function here, and the `caller` parameter here is
-  // used to get access to our original `MyState` value.
+  // implementation of that function here.
   std::cout << "Creating callback...\n";
-  FuncType ty({}, {});
-  Func host_func(store, ty, [](auto caller, auto args, auto results) -> auto {
+  Func host_func = Func::wrap(store, []() {
       std::cout << "Calling back...\n";
-      (void) caller;
-      (void) args;
-      (void) results;
-      return std::monostate();
   });
 
   // Once we've got that all set up we can then move to the instantiation

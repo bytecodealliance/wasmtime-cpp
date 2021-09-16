@@ -17,6 +17,7 @@ endfunction()
 
 add_test(simple)
 add_test(types)
+add_test(func)
 
 # Add a custom test where two files include `wasmtime.hh` and are compiled into
 # the same executable (basically makes sure any defined functions in the header
