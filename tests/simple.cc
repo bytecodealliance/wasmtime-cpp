@@ -160,11 +160,10 @@ TEST(Val, Smoke) {
   EXPECT_EQ(val.kind(), ValKind::F64);
   EXPECT_EQ(val.f64(), 6);
 
-  wasmtime_v128 v128 = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
-  val = v128;
+  val = V128();
   EXPECT_EQ(val.kind(), ValKind::V128);
   for (int i = 0; i < 16; i++) {
-    EXPECT_EQ(val.v128()[i], i);
+    EXPECT_EQ(val.v128().v128[i], 0);
   }
 
   val = std::optional<ExternRef>(std::nullopt);
@@ -294,11 +293,14 @@ TEST(Linker, Smoke) {
   Global g = unwrap(Global::create(store, GlobalType(ValKind::I32, false), 1));
   unwrap(linker.define("a", "g", g));
   unwrap(linker.define_wasi());
-  unwrap(linker.define_func(
+  unwrap(linker.func_new(
       "a", "f", FuncType({}, {}),
       [](auto caller, auto params, auto results) -> auto {
         return std::monostate();
       }));
+  unwrap(linker.func_wrap("a", "f2", [](){}));
+  unwrap(linker.func_wrap("a", "f3", [](Caller arg){}));
+  unwrap(linker.func_wrap("a", "f4", [](Caller arg, int32_t a){}));
   Module mod = unwrap(Module::compile(engine, "(module)"));
   Instance i = unwrap(Instance::create(store, mod, {}));
   unwrap(linker.define_instance(store, "x", i));

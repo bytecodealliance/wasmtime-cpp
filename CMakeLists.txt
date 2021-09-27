@@ -14,6 +14,12 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 option(ENABLE_CODE_ANALYSIS "Run code analysis" OFF)
 message(STATUS "ENABLE_CODE_ANALYSIS       ${ENABLE_CODE_ANALYSIS}")
 
+if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+   add_compile_options (-fdiagnostics-color=always)
+elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+   add_compile_options (-fcolor-diagnostics)
+endif ()
+
 add_library(wasmtime-cpp INTERFACE ${CMAKE_SOURCE_DIR}/include/wasmtime.hh)
 target_link_libraries(wasmtime-cpp INTERFACE wasmtime)
 if (MSVC)
