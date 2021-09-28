@@ -193,8 +193,6 @@ enum class Strategy {
   Auto = WASMTIME_STRATEGY_AUTO,
   /// Requires Cranelift to be used for compilation
   Cranelift = WASMTIME_STRATEGY_CRANELIFT,
-  /// Uses lightbeam for compilation (not supported)
-  Lightbeam = WASMTIME_STRATEGY_LIGHTBEAM,
 };
 
 /// \brief Values passed to `Config::cranelift_opt_level`
