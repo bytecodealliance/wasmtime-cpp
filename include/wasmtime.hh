@@ -35,7 +35,7 @@
 #include <any>
 #include <array>
 #include <initializer_list>
-#include <iostream>
+#include <iosfwd>
 #include <limits>
 #include <memory>
 #include <optional>
