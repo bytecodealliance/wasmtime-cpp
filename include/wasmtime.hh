@@ -1564,11 +1564,11 @@ public:
    * the Rust documentation -
    * https://docs.wasmtime.dev/api/wasmtime/struct.Module.html#method.deserialize
    */
-  [[nodiscard]] static Result<Module> deserialize_file(Engine &engine,
-						       const std::string &path) {
+  [[nodiscard]] static Result<Module>
+  deserialize_file(Engine &engine, const std::string &path) {
     wasmtime_module_t *ret = nullptr;
-    auto *error = wasmtime_module_deserialize_file(engine.ptr.get(),
-						   path.c_str(), &ret);
+    auto *error =
+        wasmtime_module_deserialize_file(engine.ptr.get(), path.c_str(), &ret);
     if (error != nullptr) {
       return Error(error);
     }
@@ -2257,7 +2257,7 @@ template <typename... T> struct WasmTypeList<std::tuple<T...>> {
                     const std::tuple<T...> &t) {
     size_t n = 0;
     std::apply(
-        [&](const auto &...val) {
+        [&](const auto &... val) {
           (WasmType<T>::store(cx, &storage[n++], val), ...); // NOLINT
         },
         t);
@@ -2329,7 +2329,7 @@ template <typename R, typename... A> struct WasmHostFunc<R (*)(A...)> {
   static std::optional<Trap> invoke(F &f, Caller cx, wasmtime_val_raw_t *raw) {
     auto params = Params::load(cx, raw);
     return std::apply(
-        [&](const auto &...val) {
+        [&](const auto &... val) {
           return WasmHostRet<R>::invoke(f, cx, raw, val...);
         },
         params);
@@ -2344,7 +2344,7 @@ struct WasmHostFunc<R (*)(Caller, A...)> : public WasmHostFunc<R (*)(A...)> {
   static std::optional<Trap> invoke(F &f, Caller cx, wasmtime_val_raw_t *raw) {
     auto params = WasmTypeList<std::tuple<A...>>::load(cx, raw);
     return std::apply(
-        [&](const auto &...val) {
+        [&](const auto &... val) {
           return WasmHostRet<R>::invoke(f, cx, raw, cx, val...);
         },
         params);
