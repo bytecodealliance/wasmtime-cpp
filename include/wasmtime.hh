@@ -1550,6 +1550,31 @@ public:
     return Module(ret);
   }
 
+  /**
+   * \brief Deserializes a module from an on-disk file.
+   *
+   * This function is the same as wasmtime_module_deserialize except that it
+   * reads the data for the serialized module from the path on disk. This can
+   * be faster than the alternative which may require copying the data around.
+   * the artifacts of a previous compilation to quickly create an in-memory
+   * module ready for instantiation.
+   *
+   * It is not safe to pass arbitrary input to this function, it is only safe to
+   * pass in output from previous calls to `serialize`. For more information see
+   * the Rust documentation -
+   * https://docs.wasmtime.dev/api/wasmtime/struct.Module.html#method.deserialize
+   */
+  [[nodiscard]] static Result<Module> deserialize_file(Engine &engine,
+						       const std::string &path) {
+    wasmtime_module_t *ret = nullptr;
+    auto *error = wasmtime_module_deserialize_file(engine.ptr.get(),
+						   path.c_str(), &ret);
+    if (error != nullptr) {
+      return Error(error);
+    }
+    return Module(ret);
+  }
+
   /// Returns the type of this module, which can be used to inspect the
   /// imports/exports.
   ModuleType type() { return wasmtime_module_type(ptr.get()); }

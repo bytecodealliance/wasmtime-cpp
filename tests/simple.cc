@@ -1,3 +1,4 @@
+#include <fstream>
 #include <gtest/gtest.h>
 #include <wasmtime.hh>
 
@@ -114,6 +115,12 @@ TEST(Module, Serialize) {
   Module m = unwrap(Module::compile(engine, "(module)"));
   auto bytes = unwrap(m.serialize());
   m = unwrap(Module::deserialize(engine, bytes));
+  std::string path("tmp.cwasm");
+  std::ofstream fs(path);
+  std::copy(bytes.begin(), bytes.end(), std::ostreambuf_iterator<char>(fs));
+  fs.close();
+  m = unwrap(Module::deserialize_file(engine, path));
+  ::remove(path.c_str());
 }
 
 TEST(WasiConfig, Smoke) {
