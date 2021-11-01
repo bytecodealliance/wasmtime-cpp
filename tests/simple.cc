@@ -116,7 +116,7 @@ TEST(Module, Serialize) {
   auto bytes = unwrap(m.serialize());
   m = unwrap(Module::deserialize(engine, bytes));
   std::string path("tmp.cwasm");
-  std::ofstream fs(path);
+  std::ofstream fs(path, std::ios::out | std::ios::binary);
   std::copy(bytes.begin(), bytes.end(), std::ostreambuf_iterator<char>(fs));
   fs.close();
   m = unwrap(Module::deserialize_file(engine, path));
