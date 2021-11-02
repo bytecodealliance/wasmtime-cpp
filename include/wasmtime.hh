@@ -34,9 +34,9 @@
 
 #include <any>
 #include <array>
+#include <cstdio>
 #include <initializer_list>
 #include <iosfwd>
-#include <cstdio>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -134,7 +134,7 @@ public:
   Error(std::string_view msg) : msg(msg) {}
 
   /// \brief Returns the error message associated with this error.
-  const std::string& message() const { return msg; }
+  const std::string &message() const { return msg; }
 };
 
 /// \brief Used to print an error.
