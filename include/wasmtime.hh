@@ -183,7 +183,7 @@ public:
 
 private:
   [[noreturn]] void unwrap_failed() {
-    fprintf(stderr, "error: %s\n", this->err().message().c_str());
+    fprintf(stderr, "error: %s\n", this->err().message().c_str()); // NOLINT
     std::abort();
   }
 };
