@@ -1,4 +1,3 @@
-#include <fstream>
 #include <gtest/gtest.h>
 #include <wasmtime.hh>
 
@@ -115,10 +114,10 @@ TEST(Module, Serialize) {
   Module m = unwrap(Module::compile(engine, "(module)"));
   auto bytes = unwrap(m.serialize());
   m = unwrap(Module::deserialize(engine, bytes));
-  std::string path("tmp.cwasm");
-  std::ofstream fs(path, std::ios::out | std::ios::binary);
-  std::copy(bytes.begin(), bytes.end(), std::ostreambuf_iterator<char>(fs));
-  fs.close();
+  std::string path("test_deserialize_file.cwasm");
+  auto fh = ::fopen(path.c_str(), "w");
+  ::fwrite(bytes.data(), sizeof(uint8_t), bytes.size(), fh);
+  ::fclose(fh);
   m = unwrap(Module::deserialize_file(engine, path));
   ::remove(path.c_str());
 }
