@@ -115,7 +115,7 @@ TEST(Module, Serialize) {
   auto bytes = unwrap(m.serialize());
   m = unwrap(Module::deserialize(engine, bytes));
   std::string path("test_deserialize_file.cwasm");
-  auto fh = ::fopen(path.c_str(), "w");
+  auto fh = ::fopen(path.c_str(), "wb");
   ::fwrite(bytes.data(), sizeof(uint8_t), bytes.size(), fh);
   ::fclose(fh);
   m = unwrap(Module::deserialize_file(engine, path));
