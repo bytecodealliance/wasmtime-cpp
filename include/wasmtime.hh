@@ -34,6 +34,7 @@
 
 #include <any>
 #include <array>
+#include <cstdio>
 #include <initializer_list>
 #include <iosfwd>
 #include <limits>
@@ -133,7 +134,7 @@ public:
   Error(std::string_view msg) : msg(msg) {}
 
   /// \brief Returns the error message associated with this error.
-  std::string_view message() const { return msg; }
+  const std::string &message() const { return msg; }
 };
 
 /// \brief Used to print an error.
@@ -177,12 +178,12 @@ public:
     if (*this) {
       return this->ok();
     }
-    abort();
+    unwrap_failed();
   }
 
 private:
-  [[noreturn]] void abort() {
-    std::cerr << "error: " << this->err().message() << "\n";
+  [[noreturn]] void unwrap_failed() {
+    fprintf(stderr, "error: %s\n", this->err().message().c_str()); // NOLINT
     std::abort();
   }
 };
