@@ -1554,11 +1554,9 @@ public:
   /**
    * \brief Deserializes a module from an on-disk file.
    *
-   * This function is the same as wasmtime_module_deserialize except that it
-   * reads the data for the serialized module from the path on disk. This can
-   * be faster than the alternative which may require copying the data around.
-   * the artifacts of a previous compilation to quickly create an in-memory
-   * module ready for instantiation.
+   * This function is the same as `deserialize` except that it reads the data
+   * for the serialized module from the path on disk. This can be faster than
+   * the alternative which may require copying the data around.
    *
    * It is not safe to pass arbitrary input to this function, it is only safe to
    * pass in output from previous calls to `serialize`. For more information see
