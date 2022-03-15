@@ -246,11 +246,12 @@ public:
     wasmtime_config_debug_info_set(ptr.get(), enable);
   }
 
-  /// \brief Configures whether WebAssembly code can be interrupted.
+  /// \brief Configures whether epochs are enabled which can be used to
+  /// interrupt currently executing WebAssembly.
   ///
-  /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.interruptable
-  void interruptable(bool enable) {
-    wasmtime_config_interruptable_set(ptr.get(), enable);
+  /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.epoch_interruption
+  void epoch_interruption(bool enable) {
+    wasmtime_config_epoch_interruption_set(ptr.get(), enable);
   }
 
   /// \brief Configures whether WebAssembly code will consume fuel and trap when
@@ -419,6 +420,13 @@ public:
   /// \brief Creates an engine with the specified compilation settings.
   explicit Engine(Config config)
       : ptr(wasm_engine_new_with_config(config.ptr.release())) {}
+
+  /// \brief Increments the current epoch which may result in interrupting
+  /// currently executing WebAssembly in connected stores if the epoch is now
+  /// beyond the configured threshold.
+  void increment_epoch() const {
+    wasmtime_engine_increment_epoch(ptr.get());
+  }
 };
 
 /**
@@ -1600,28 +1608,6 @@ public:
 };
 
 /**
- * \brief Handle used to interrupt execution of WebAssembly from another thread.
- */
-class InterruptHandle {
-  friend class Store;
-
-  struct deleter {
-    void operator()(wasmtime_interrupt_handle_t *p) const {
-      wasmtime_interrupt_handle_delete(p);
-    }
-  };
-
-  std::unique_ptr<wasmtime_interrupt_handle_t, deleter> ptr;
-
-  InterruptHandle(wasmtime_interrupt_handle_t *ptr) : ptr(ptr) {}
-
-public:
-  /// Indicates that the WebAssembly executing in the store this handle is
-  /// connected to should be interrupted as soon as possible.
-  void interrupt() const { wasmtime_interrupt_handle_interrupt(ptr.get()); }
-};
-
-/**
  * \brief Configuration for an instance of WASI.
  *
  * This is inserted into a store with `Store::Context::set_wasi`.
@@ -1825,16 +1811,14 @@ public:
       return std::monostate();
     }
 
-    /// Returns a handle, which can be sent to another thread, which can be used
-    /// to interrupt execution of WebAssembly within this `Store`.
+    /// Configures this store's epoch deadline to be the specified number of
+    /// ticks beyond the engine's current epoch.
     ///
-    /// This requires `Config::interruptable` to be enabled to retun a handle.
-    std::optional<InterruptHandle> interrupt_handle() {
-      auto *handle = wasmtime_interrupt_handle_new(ptr);
-      if (handle != nullptr) {
-        return InterruptHandle(handle);
-      }
-      return std::nullopt;
+    /// By default the deadline is the current engine's epoch, immediately
+    /// interrupting code if epoch interruption is enabled. This must be called
+    /// to extend the deadline to allow interruption.
+    void set_epoch_deadline(uint64_t ticks_beyond_current) {
+      wasmtime_context_set_epoch_deadline(ptr, ticks_beyond_current);
     }
 
     /// Returns the raw context pointer for the C API.

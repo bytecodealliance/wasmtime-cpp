@@ -39,10 +39,10 @@ int main() {
   // Enable interruptable code via `Config` and then create an interrupt
   // handle which we'll use later to interrupt running code.
   Config config;
-  config.interruptable(true);
+  config.epoch_interruption(true);
   Engine engine(std::move(config));
   Store store(engine);
-  auto handle = *store.context().interrupt_handle();
+  store.context().set_epoch_deadline(1);
 
   // Compile and instantiate a small example with an infinite loop.
   auto wat = readFile("examples/interrupt.wat");
@@ -51,10 +51,10 @@ int main() {
   Func run = std::get<Func>(*instance.get(store, "run"));
 
   // Spin up a thread to send us an interrupt in a second
-  std::thread t([handle{std::move(handle)}](){
+  std::thread t([engine{std::move(engine)}](){
     std::this_thread::sleep_for(std::chrono::seconds(1));
     std::cout << "Interrupting!\n";
-    handle.interrupt();
+    engine.increment_epoch();
   });
 
   std::cout << "Entering infinite loop ...\n";
