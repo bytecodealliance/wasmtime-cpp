@@ -424,9 +424,7 @@ public:
   /// \brief Increments the current epoch which may result in interrupting
   /// currently executing WebAssembly in connected stores if the epoch is now
   /// beyond the configured threshold.
-  void increment_epoch() const {
-    wasmtime_engine_increment_epoch(ptr.get());
-  }
+  void increment_epoch() const { wasmtime_engine_increment_epoch(ptr.get()); }
 };
 
 /**
