@@ -21,8 +21,8 @@ TEST(Store, Smoke) {
   store = Store(engine);
   store.context().gc();
   EXPECT_EQ(store.context().fuel_consumed(), std::nullopt);
-  EXPECT_EQ(store.context().interrupt_handle(), std::nullopt);
   store.context().add_fuel(1).err();
+  store.context().set_epoch_deadline(1);
 }
 
 TEST(Engine, Smoke) {
@@ -34,7 +34,7 @@ TEST(Engine, Smoke) {
 TEST(Config, Smoke) {
   Config config;
   config.debug_info(false);
-  config.interruptable(false);
+  config.epoch_interruption(false);
   config.consume_fuel(false);
   config.max_wasm_stack(100);
   config.wasm_threads(false);
