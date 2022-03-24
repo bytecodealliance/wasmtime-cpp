@@ -83,9 +83,8 @@ TEST(FuncType, Smoke) {
 TEST(ModuleType, Smoke) {
   Engine engine;
   Module module = unwrap(Module::compile(engine, "(module)"));
-  ModuleType ty = module.type();
-  EXPECT_EQ(ty->imports().size(), 0);
-  EXPECT_EQ(ty->exports().size(), 0);
+  EXPECT_EQ(module.imports().size(), 0);
+  EXPECT_EQ(module.exports().size(), 0);
 
   module = unwrap(Module::compile(engine,
     "(module"
@@ -93,9 +92,8 @@ TEST(ModuleType, Smoke) {
       "(global (export \"x\") i32 (i32.const 0))"
     ")"
   ));
-  ty = module.type();
 
-  auto imports = ty->imports();
+  auto imports = module.imports();
   EXPECT_EQ(imports.size(), 1);
   auto i = *imports.begin();
   EXPECT_EQ(i.module(), "a");
@@ -106,7 +104,7 @@ TEST(ModuleType, Smoke) {
 
   for (auto &imp : imports) {}
 
-  auto exports = ty->exports();
+  auto exports = module.exports();
   EXPECT_EQ(exports.size(), 1);
   auto e = *exports.begin();
   EXPECT_EQ(e.name(), "x");
@@ -116,38 +114,13 @@ TEST(ModuleType, Smoke) {
 
   for (auto &exp : exports) {}
 
-  auto other_imports = ty->imports();
+  auto other_imports = module.imports();
   other_imports = std::move(imports);
   ImportType::List last_imports(std::move(other_imports));
 
-  auto other_exports = ty->exports();
+  auto other_exports = module.exports();
   other_exports = std::move(exports);
   ExportType::List last_exports(std::move(other_exports));
-}
-
-TEST(InstanceType, Smoke) {
-  Engine engine;
-  Module module = unwrap(Module::compile(engine, "(module)"));
-  Store store(engine);
-  Instance instance = unwrap(Instance::create(store, module, {}));
-  auto ty = instance.type(store);
-  EXPECT_EQ(ty->exports().size(), 0);
-
-  module = unwrap(Module::compile(engine,
-    "(module"
-      "(global (export \"x\") i32 (i32.const 0))"
-    ")"
-  ));
-  instance = unwrap(Instance::create(store, module, {}));
-  ty = instance.type(store);
-
-  auto exports = ty->exports();
-  EXPECT_EQ(exports.size(), 1);
-  auto e = *exports.begin();
-  EXPECT_EQ(e.name(), "x");
-  auto export_ty = std::get<GlobalType::Ref>(ExternType::from_export(e));
-  EXPECT_EQ(export_ty.content().kind(), ValKind::I32);
-  EXPECT_FALSE(export_ty.is_mutable());
 }
 
 TEST(MemoryType, SixtyFour) {
