@@ -42,7 +42,6 @@ TEST(Config, Smoke) {
   config.wasm_simd(false);
   config.wasm_bulk_memory(false);
   config.wasm_multi_value(false);
-  config.wasm_module_linking(false);
   unwrap(config.strategy(Strategy::Auto));
   config.cranelift_debug_verifier(false);
   config.cranelift_opt_level(OptLevel::Speed);

@@ -305,14 +305,6 @@ public:
     wasmtime_config_wasm_multi_value_set(ptr.get(), enable);
   }
 
-  /// \brief Configures whether the WebAssembly module linking proposal is
-  /// enabled
-  ///
-  /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.wasm_module_linking
-  void wasm_module_linking(bool enable) {
-    wasmtime_config_wasm_module_linking_set(ptr.get(), enable);
-  }
-
   /// \brief Configures compilation strategy for wasm code.
   ///
   /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.strategy
@@ -1005,9 +997,7 @@ public:
 
   /// An owned list of `ImportType` instances.
   class List {
-    friend class InstanceType;
-    friend class ModuleType;
-
+    friend class Module;
     wasm_importtype_vec_t list;
 
   public:
@@ -1077,9 +1067,7 @@ public:
 
   /// An owned list of `ExportType` instances.
   class List {
-    friend class InstanceType;
-    friend class ModuleType;
-
+    friend class Module;
     wasm_exporttype_vec_t list;
 
   public:
@@ -1121,111 +1109,6 @@ public:
 };
 
 /**
- * \brief Type information about a WebAssembly module.
- */
-class ModuleType {
-  friend class Module;
-
-  struct deleter {
-    void operator()(wasmtime_moduletype_t *p) const {
-      wasmtime_moduletype_delete(p);
-    }
-  };
-
-  std::unique_ptr<wasmtime_moduletype_t, deleter> ptr;
-
-public:
-  /// Non-owning reference to a `ModuleType`, must not be used after the owner
-  /// has been deleted.
-  class Ref {
-    friend class ModuleType;
-
-    const wasmtime_moduletype_t *ptr;
-
-  public:
-    /// Creates a new reference from the raw underlying C API representation.
-    Ref(const wasmtime_moduletype_t *ptr) : ptr(ptr) {}
-    /// Creates a reference to the given type.
-    Ref(const ModuleType &ty) : Ref(ty.ptr.get()) {}
-
-    /// Returns the list of types imported by this module.
-    ImportType::List imports() const {
-      ImportType::List list;
-      wasmtime_moduletype_imports(ptr, &list.list);
-      return list;
-    }
-
-    /// Returns the list of types exported by this module.
-    ExportType::List exports() const {
-      ExportType::List list;
-      wasmtime_moduletype_exports(ptr, &list.list);
-      return list;
-    }
-  };
-
-private:
-  Ref ref;
-  ModuleType(wasmtime_moduletype_t *ptr) : ptr(ptr), ref(ptr) {}
-
-public:
-  /// \brief Returns the underlying `Ref`, a non-owning reference pointing to
-  /// this instance.
-  Ref *operator->() { return &ref; }
-  /// \brief Returns the underlying `Ref`, a non-owning reference pointing to
-  /// this instance.
-  Ref *operator*() { return &ref; }
-};
-
-/**
- * \brief Type information about a WebAssembly instance.
- */
-class InstanceType {
-  friend class Instance;
-
-  struct deleter {
-    void operator()(wasmtime_instancetype_t *p) const {
-      wasmtime_instancetype_delete(p);
-    }
-  };
-
-  std::unique_ptr<wasmtime_instancetype_t, deleter> ptr;
-
-public:
-  /// Non-owning reference to an `InstanceType`, must not be used after the
-  /// original owner is deleted.
-  class Ref {
-    friend class InstanceType;
-
-    const wasmtime_instancetype_t *ptr;
-
-  public:
-    /// Creates a new reference from the raw underlying C API representation.
-    Ref(const wasmtime_instancetype_t *ptr) : ptr(ptr) {}
-    /// Creates a new reference to the provided type.
-    Ref(const InstanceType &ty) : Ref(ty.ptr.get()) {}
-
-    /// Returns the list of types exported by this instance.
-    ExportType::List exports() const {
-      ExportType::List list;
-      wasmtime_instancetype_exports(ptr, &list.list);
-      return list;
-    }
-  };
-
-private:
-  Ref ref;
-  InstanceType(wasmtime_instancetype_t *ptr) : ptr(ptr), ref(ptr) {}
-
-public:
-  /// \brief Returns the underlying `Ref`, a non-owning reference pointing to
-  /// this instance.
-  Ref *operator->() { return &ref; }
-  /// \brief Returns the underlying `Ref`, a non-owning reference pointing to
-  /// this instance.
-  Ref *operator*() { return &ref; }
-};
-
-/**
  * \brief Generic type of a WebAssembly item.
  */
 class ExternType {
@@ -1240,7 +1123,7 @@ public:
   /// otherwise this is used to determine what the actual type of the outer item
   /// is.
   typedef std::variant<FuncType::Ref, GlobalType::Ref, TableType::Ref,
-                       MemoryType::Ref, ModuleType::Ref, InstanceType::Ref>
+                       MemoryType::Ref>
       Ref;
 
   /// Extract the type of the item imported by the provided type.
@@ -1268,14 +1151,6 @@ private:
       return wasm_externtype_as_tabletype_const(ptr);
     case WASM_EXTERN_MEMORY:
       return wasm_externtype_as_memorytype_const(ptr);
-    case WASMTIME_EXTERN_MODULE:
-      // Should probably just add const versions of these functions to
-      // wasmtime's C API?
-      return wasmtime_externtype_as_moduletype(
-          const_cast<wasm_externtype_t *>(ptr)); // NOLINT
-    case WASMTIME_EXTERN_INSTANCE:
-      return wasmtime_externtype_as_instancetype(
-          const_cast<wasm_externtype_t *>(ptr)); // NOLINT
     }
     std::abort();
   }
@@ -1580,9 +1455,19 @@ public:
     return Module(ret);
   }
 
-  /// Returns the type of this module, which can be used to inspect the
-  /// imports/exports.
-  ModuleType type() { return wasmtime_module_type(ptr.get()); }
+  /// Returns the list of types imported by this module.
+  ImportType::List imports() const {
+    ImportType::List list;
+    wasmtime_module_imports(ptr.get(), &list.list);
+    return list;
+  }
+
+  /// Returns the list of types exported by this module.
+  ExportType::List exports() const {
+    ExportType::List list;
+    wasmtime_module_exports(ptr.get(), &list.list);
+    return list;
+  }
 
   /**
    * \brief Serializes this module to a list of bytes.
@@ -1899,7 +1784,7 @@ class Table;
 
 /// \typedef Extern
 /// \brief Representation of an external WebAssembly item
-typedef std::variant<Instance, Module, Func, Global, Memory, Table> Extern;
+typedef std::variant<Func, Global, Memory, Table> Extern;
 
 /// \brief Container for the `v128` WebAssembly type.
 struct V128 {
@@ -2938,10 +2823,6 @@ class Instance {
       return Memory(e.of.memory);
     case WASMTIME_EXTERN_TABLE:
       return Table(e.of.table);
-    case WASMTIME_EXTERN_INSTANCE:
-      return Instance(e.of.instance);
-    case WASMTIME_EXTERN_MODULE:
-      return Module(e.of.module);
     }
     std::abort();
   }
@@ -2959,12 +2840,6 @@ class Instance {
     } else if (const auto *memory = std::get_if<Memory>(&e)) {
       raw.kind = WASMTIME_EXTERN_MEMORY;
       raw.of.memory = memory->memory;
-    } else if (const auto *instance = std::get_if<Instance>(&e)) {
-      raw.kind = WASMTIME_EXTERN_INSTANCE;
-      raw.of.instance = instance->instance;
-    } else if (const auto *module = std::get_if<Module>(&e)) {
-      raw.kind = WASMTIME_EXTERN_MODULE;
-      raw.of.module = module->ptr.get();
     } else {
       std::abort();
     }
@@ -3010,11 +2885,6 @@ public:
       return TrapError(Trap(trap));
     }
     return Instance(instance);
-  }
-
-  /// Returns the type of this instance.
-  InstanceType type(Store::Context cx) const {
-    return wasmtime_instance_type(cx.ptr, &instance);
   }
 
   /**
