@@ -2285,7 +2285,8 @@ class Func {
   template <typename F>
   static wasm_trap_t *
   raw_callback_unchecked(void *env, wasmtime_caller_t *caller,
-                         wasmtime_val_raw_t *args_and_results) {
+                         wasmtime_val_raw_t *args_and_results,
+                         size_t nargs_and_results) {
     using HostFunc = WasmHostFunc<F>;
     Caller cx(caller);
     F *func = reinterpret_cast<F *>(env); // NOLINT
