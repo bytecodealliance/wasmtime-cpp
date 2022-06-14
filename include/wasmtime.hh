@@ -308,13 +308,8 @@ public:
   /// \brief Configures compilation strategy for wasm code.
   ///
   /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.strategy
-  [[nodiscard]] Result<std::monostate> strategy(Strategy strategy) {
-    auto *error = wasmtime_config_strategy_set(
-        ptr.get(), static_cast<wasmtime_strategy_t>(strategy));
-    if (error != nullptr) {
-      return Error(error);
-    }
-    return std::monostate();
+  void strategy(Strategy strategy) {
+    wasmtime_config_strategy_set(ptr.get(), static_cast<wasmtime_strategy_t>(strategy));
   }
 
   /// \brief Configures whether cranelift's debug verifier is enabled
@@ -335,13 +330,8 @@ public:
   /// \brief Configures an active wasm profiler
   ///
   /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.profiler
-  [[nodiscard]] Result<std::monostate> profiler(ProfilingStrategy profiler) {
-    auto *error = wasmtime_config_profiler_set(
-        ptr.get(), static_cast<wasmtime_profiling_strategy_t>(profiler));
-    if (error != nullptr) {
-      return Error(error);
-    }
-    return std::monostate();
+  void profiler(ProfilingStrategy profiler) {
+    wasmtime_config_profiler_set(ptr.get(), static_cast<wasmtime_profiling_strategy_t>(profiler));
   }
 
   /// \brief Configures the maximum size of memory to use a "static memory"

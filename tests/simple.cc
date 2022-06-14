@@ -42,10 +42,10 @@ TEST(Config, Smoke) {
   config.wasm_simd(false);
   config.wasm_bulk_memory(false);
   config.wasm_multi_value(false);
-  unwrap(config.strategy(Strategy::Auto));
+  config.strategy(Strategy::Auto);
   config.cranelift_debug_verifier(false);
   config.cranelift_opt_level(OptLevel::Speed);
-  unwrap(config.profiler(ProfilingStrategy::None));
+  config.profiler(ProfilingStrategy::None);
   config.static_memory_maximum_size(0);
   config.static_memory_guard_size(0);
   config.dynamic_memory_guard_size(0);
