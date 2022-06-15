@@ -309,7 +309,8 @@ public:
   ///
   /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.strategy
   void strategy(Strategy strategy) {
-    wasmtime_config_strategy_set(ptr.get(), static_cast<wasmtime_strategy_t>(strategy));
+    wasmtime_config_strategy_set(ptr.get(),
+                                 static_cast<wasmtime_strategy_t>(strategy));
   }
 
   /// \brief Configures whether cranelift's debug verifier is enabled
@@ -331,7 +332,8 @@ public:
   ///
   /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.profiler
   void profiler(ProfilingStrategy profiler) {
-    wasmtime_config_profiler_set(ptr.get(), static_cast<wasmtime_profiling_strategy_t>(profiler));
+    wasmtime_config_profiler_set(
+        ptr.get(), static_cast<wasmtime_profiling_strategy_t>(profiler));
   }
 
   /// \brief Configures the maximum size of memory to use a "static memory"
