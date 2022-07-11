@@ -14,12 +14,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  format:
-    runs-on: macos-latest
-    steps:
-    - uses: actions/checkout@v2
-    - run: /usr/local/opt/llvm/bin/clang-format include/wasmtime.hh --dry-run --Werror
-
   doc:
     runs-on: ubuntu-latest
     steps:
@@ -76,11 +70,6 @@ jobs:
           config: Release
         - os: macos-latest
           config: Debug
-
-        # clang-tidy
-        - os: macos-latest
-          config: Debug
-          args: -DENABLE_CODE_ANALYSIS=YES
 
         # clang-cl debug/release
         - os: windows-latest
