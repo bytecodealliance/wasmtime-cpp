@@ -109,6 +109,8 @@ private:
 
 #endif
 
+class Trace;
+
 /**
  * \brief Errors coming from Wasmtime
  *
@@ -116,25 +118,41 @@ private:
  * description of the error that occurred.
  */
 class Error {
-  std::string msg;
+  struct deleter {
+    void operator()(wasmtime_error_t *p) const { wasmtime_error_delete(p); }
+  };
+
+  std::unique_ptr<wasmtime_error_t, deleter> ptr;
 
 public:
   /// \brief Creates an error from the raw C API representation
   ///
   /// Takes ownership of the provided `error`.
-  Error(wasmtime_error_t *error) {
-    wasm_byte_vec_t msg_bytes;
-    wasmtime_error_message(error, &msg_bytes);
-    msg = std::string(msg_bytes.data, msg_bytes.size);
-    wasm_byte_vec_delete(&msg_bytes);
-    wasmtime_error_delete(error);
-  }
-
-  /// \brief Creates a custom error from a custom error string.
-  Error(std::string_view msg) : msg(msg) {}
+  Error(wasmtime_error_t *error) : ptr(error) {}
 
   /// \brief Returns the error message associated with this error.
-  const std::string &message() const { return msg; }
+  std::string message() const {
+    wasm_byte_vec_t msg_bytes;
+    wasmtime_error_message(ptr.get(), &msg_bytes);
+    auto ret = std::string(msg_bytes.data, msg_bytes.size);
+    wasm_byte_vec_delete(&msg_bytes);
+    return ret;
+  }
+
+  /// If this trap represents a call to `exit` for WASI, this will return the
+  /// optional error code associated with the exit trap.
+  std::optional<int32_t> i32_exit() const {
+    int32_t status = 0;
+    if (wasmtime_error_exit_status(ptr.get(), &status)) {
+      return status;
+    }
+    return std::nullopt;
+  }
+
+  /// Returns the trace of WebAssembly frames associated with this error.
+  ///
+  /// Note that the `trace` cannot outlive this error object.
+  Trace trace() const;
 };
 
 /// \brief Used to print an error.
@@ -1203,6 +1221,7 @@ public:
  */
 class Trace {
   friend class Trap;
+  friend class Error;
 
   wasm_frame_vec_t vec;
 
@@ -1230,6 +1249,12 @@ public:
   /// Returns the size of this trace, or how many frames it contains.
   size_t size() const { return vec.size; }
 };
+
+inline Trace Error::trace() const {
+  wasm_frame_vec_t frames;
+  wasmtime_error_wasm_trace(ptr.get(), &frames);
+  return Trace(frames);
+}
 
 /**
  * \brief Information about a WebAssembly trap.
@@ -1269,17 +1294,9 @@ public:
     return ret;
   }
 
-  /// If this trap represents a call to `exit` for WASI, this will return the
-  /// optional error code associated with the exit trap.
-  std::optional<int32_t> i32_exit() const {
-    int32_t status = 0;
-    if (wasmtime_trap_exit_status(ptr.get(), &status)) {
-      return status;
-    }
-    return std::nullopt;
-  }
-
   /// Returns the trace of WebAssembly frames associated with this trap.
+  ///
+  /// Note that the `trace` cannot outlive this error object.
   Trace trace() const {
     wasm_frame_vec_t frames;
     wasm_trap_trace(ptr.get(), &frames);
@@ -2465,11 +2482,11 @@ public:
   template <typename Params, typename Results,
             std::enable_if_t<WasmTypeList<Params>::valid, bool> = true,
             std::enable_if_t<WasmTypeList<Results>::valid, bool> = true>
-  Result<TypedFunc<Params, Results>> typed(Store::Context cx) const {
+  Result<TypedFunc<Params, Results>, Trap> typed(Store::Context cx) const {
     auto ty = this->type(cx);
     if (!WasmTypeList<Params>::matches(ty->params()) ||
         !WasmTypeList<Results>::matches(ty->results())) {
-      return Error("static type for this function does not match actual type");
+      return Trap("static type for this function does not match actual type");
     }
     TypedFunc<Params, Results> ret(*this);
     return ret;

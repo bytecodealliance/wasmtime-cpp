@@ -64,7 +64,6 @@ TEST(wat2wasm, Smoke) {
 TEST(Trap, Smoke) {
   Trap t("foo");
   EXPECT_EQ(t.message(), "foo");
-  EXPECT_EQ(t.i32_exit(), std::nullopt);
   EXPECT_EQ(t.trace().size(), 0);
 
   Engine engine;
