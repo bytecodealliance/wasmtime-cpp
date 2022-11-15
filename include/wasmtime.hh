@@ -2516,15 +2516,19 @@ public:
    * Note that this function still may return a `Trap` indicating that calling
    * the WebAssembly function failed.
    */
-  Result<Results, Trap> call(Store::Context cx, Params params) const {
+  TrapResult<Results> call(Store::Context cx, Params params) const {
     std::array<wasmtime_val_raw_t, std::max(WasmTypeList<Params>::size,
                                             WasmTypeList<Results>::size)>
         storage;
     WasmTypeList<Params>::store(cx, storage.data(), params);
-    auto *trap =
-        wasmtime_func_call_unchecked(cx.raw_context(), &f.func, storage.data());
+    wasm_trap_t *trap = nullptr;
+    auto *error =
+        wasmtime_func_call_unchecked(cx.raw_context(), &f.func, storage.data(), &trap);
+    if (error != nullptr) {
+      return TrapError(Error(error));
+    }
     if (trap != nullptr) {
-      return Trap(trap);
+      return TrapError(Trap(trap));
     }
     return WasmTypeList<Results>::load(cx, storage.data());
   }
