@@ -2975,11 +2975,11 @@ public:
 
   /// Defines the provided item into this linker with the given name.
   [[nodiscard]] Result<std::monostate>
-  define(std::string_view module, std::string_view name, const Extern &item) {
+  define(Store::Context cx, std::string_view module, std::string_view name, const Extern &item) {
     wasmtime_extern_t raw;
     Instance::cvt(item, raw);
     auto *error =
-        wasmtime_linker_define(ptr.get(), module.data(), module.size(),
+        wasmtime_linker_define(ptr.get(), cx.ptr, module.data(), module.size(),
                                name.data(), name.size(), &raw);
     if (error != nullptr) {
       return Error(error);

@@ -295,7 +295,7 @@ TEST(Linker, Smoke) {
   Store store(engine);
   linker.allow_shadowing(false);
   Global g = unwrap(Global::create(store, GlobalType(ValKind::I32, false), 1));
-  unwrap(linker.define("a", "g", g));
+  unwrap(linker.define(store, "a", "g", g));
   unwrap(linker.define_wasi());
   unwrap(linker.func_new(
       "a", "f", FuncType({}, {}),
