@@ -20,7 +20,7 @@ elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
    add_compile_options (-fcolor-diagnostics)
 endif ()
 
-add_library(wasmtime-cpp INTERFACE ${CMAKE_SOURCE_DIR}/include/wasmtime.hh)
+add_library(wasmtime-cpp INTERFACE)
 target_link_libraries(wasmtime-cpp INTERFACE wasmtime)
 if (MSVC)
   target_compile_options(wasmtime-cpp INTERFACE /DWASM_API_EXTERN= /DWASI_API_EXTERN=)
