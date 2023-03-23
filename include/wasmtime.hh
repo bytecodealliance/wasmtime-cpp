@@ -168,7 +168,7 @@ inline std::ostream &operator<<(std::ostream &os, const Error &e) {
  * This behaves similarly to Rust's `Result<T, E>` and will be replaced with a
  * C++ standard when it exists.
  */
-template <typename T, typename E = Error> class Result {
+template <typename T, typename E = Error> class [[nodiscard]] Result {
   std::variant<T, E> data;
 
 public:
@@ -378,7 +378,7 @@ public:
   /// \brief Loads the default cache configuration present on the system.
   ///
   /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.cache_config_load_default
-  [[nodiscard]] Result<std::monostate> cache_load_default() {
+  Result<std::monostate> cache_load_default() {
     auto *error = wasmtime_config_cache_config_load(ptr.get(), nullptr);
     if (error != nullptr) {
       return Error(error);
@@ -389,7 +389,7 @@ public:
   /// \brief Loads cache configuration from the specified filename.
   ///
   /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.cache_config_load
-  [[nodiscard]] Result<std::monostate> cache_load(const std::string &path) {
+  Result<std::monostate> cache_load(const std::string &path) {
     auto *error = wasmtime_config_cache_config_load(ptr.get(), path.c_str());
     if (error != nullptr) {
       return Error(error);
@@ -440,8 +440,7 @@ public:
  *
  * Returns either an error if parsing failed or the wasm binary.
  */
-[[nodiscard]] inline Result<std::vector<uint8_t>>
-wat2wasm(std::string_view wat) {
+inline Result<std::vector<uint8_t>> wat2wasm(std::string_view wat) {
   wasm_byte_vec_t ret;
   auto *error = wasmtime_wat2wasm(wat.data(), wat.size(), &ret);
   if (error != nullptr) {
@@ -1371,8 +1370,7 @@ public:
    * This function will automatically use `wat2wasm` on the input and then
    * delegate to the #compile function.
    */
-  [[nodiscard]] static Result<Module> compile(Engine &engine,
-                                              std::string_view wat) {
+  static Result<Module> compile(Engine &engine, std::string_view wat) {
     auto wasm = wat2wasm(wat);
     if (!wasm) {
       return wasm.err();
@@ -1391,8 +1389,7 @@ public:
    * This function can fail if the WebAssembly binary is invalid or doesn't
    * validate (or similar).
    */
-  [[nodiscard]] static Result<Module> compile(Engine &engine,
-                                              Span<uint8_t> wasm) {
+  static Result<Module> compile(Engine &engine, Span<uint8_t> wasm) {
     wasmtime_module_t *ret = nullptr;
     auto *error =
         wasmtime_module_new(engine.ptr.get(), wasm.data(), wasm.size(), &ret);
@@ -1408,8 +1405,7 @@ public:
    * This function will validate whether the provided binary is indeed valid
    * within the compilation settings of the `engine` provided.
    */
-  [[nodiscard]] static Result<std::monostate> validate(Engine &engine,
-                                                       Span<uint8_t> wasm) {
+  static Result<std::monostate> validate(Engine &engine, Span<uint8_t> wasm) {
     auto *error =
         wasmtime_module_validate(engine.ptr.get(), wasm.data(), wasm.size());
     if (error != nullptr) {
@@ -1430,8 +1426,7 @@ public:
    * the Rust documentation -
    * https://docs.wasmtime.dev/api/wasmtime/struct.Module.html#method.deserialize
    */
-  [[nodiscard]] static Result<Module> deserialize(Engine &engine,
-                                                  Span<uint8_t> wasm) {
+  static Result<Module> deserialize(Engine &engine, Span<uint8_t> wasm) {
     wasmtime_module_t *ret = nullptr;
     auto *error = wasmtime_module_deserialize(engine.ptr.get(), wasm.data(),
                                               wasm.size(), &ret);
@@ -1453,8 +1448,8 @@ public:
    * the Rust documentation -
    * https://docs.wasmtime.dev/api/wasmtime/struct.Module.html#method.deserialize
    */
-  [[nodiscard]] static Result<Module>
-  deserialize_file(Engine &engine, const std::string &path) {
+  static Result<Module> deserialize_file(Engine &engine,
+                                         const std::string &path) {
     wasmtime_module_t *ret = nullptr;
     auto *error =
         wasmtime_module_deserialize_file(engine.ptr.get(), path.c_str(), &ret);
@@ -1484,7 +1479,7 @@ public:
    * The returned bytes can then be used to later pass to `deserialize` to
    * quickly recreate this module in a different process perhaps.
    */
-  [[nodiscard]] Result<std::vector<uint8_t>> serialize() const {
+  Result<std::vector<uint8_t>> serialize() const {
     wasm_byte_vec_t bytes;
     auto *error = wasmtime_module_serialize(ptr.get(), &bytes);
     if (error != nullptr) {
@@ -1659,7 +1654,7 @@ public:
     /// this is required if you want to let WebAssembly actually execute.
     ///
     /// Returns an error if fuel consumption isn't enabled.
-    [[nodiscard]] Result<std::monostate> add_fuel(uint64_t fuel) {
+    Result<std::monostate> add_fuel(uint64_t fuel) {
       auto *error = wasmtime_context_add_fuel(ptr, fuel);
       if (error != nullptr) {
         return Error(error);
@@ -1695,7 +1690,7 @@ public:
     /// This will only have an effect if used in conjunction with
     /// `Linker::define_wasi` because otherwise no host functions will use the
     /// WASI state.
-    [[nodiscard]] Result<std::monostate> set_wasi(WasiConfig config) {
+    Result<std::monostate> set_wasi(WasiConfig config) {
       auto *error = wasmtime_context_set_wasi(ptr, config.ptr.release());
       if (error != nullptr) {
         return Error(error);
@@ -2428,8 +2423,8 @@ public:
    * > signature is statically known it's recommended to use `Func::typed` and
    * > `TypedFunc::call`.
    */
-  [[nodiscard]] TrapResult<std::vector<Val>>
-  call(Store::Context cx, const std::vector<Val> &params) const {
+  TrapResult<std::vector<Val>> call(Store::Context cx,
+                                    const std::vector<Val> &params) const {
     std::vector<wasmtime_val_t> raw_params;
     raw_params.reserve(params.size());
     for (const auto &param : params) {
@@ -2614,8 +2609,8 @@ public:
    *
    * This function can fail if `init` does not have a value that matches `ty`.
    */
-  [[nodiscard]] static Result<Global>
-  create(Store::Context cx, const GlobalType &ty, const Val &init) {
+  static Result<Global> create(Store::Context cx, const GlobalType &ty,
+                               const Val &init) {
     wasmtime_global_t global;
     auto *error = wasmtime_global_new(cx.ptr, ty.ptr.get(), &init.val, &global);
     if (error != nullptr) {
@@ -2635,8 +2630,7 @@ public:
   /// Sets this global to a new value.
   ///
   /// This can fail if `val` has the wrong type or if this global isn't mutable.
-  [[nodiscard]] Result<std::monostate> set(Store::Context cx,
-                                           const Val &val) const {
+  Result<std::monostate> set(Store::Context cx, const Val &val) const {
     auto *error = wasmtime_global_set(cx.ptr, &global, &val.val);
     if (error != nullptr) {
       return Error(error);
@@ -2674,8 +2668,8 @@ public:
    *
    * Returns an error if `init` has the wrong value for the `ty` specified.
    */
-  [[nodiscard]] static Result<Table>
-  create(Store::Context cx, const TableType &ty, const Val &init) {
+  static Result<Table> create(Store::Context cx, const TableType &ty,
+                              const Val &init) {
     wasmtime_table_t table;
     auto *error = wasmtime_table_new(cx.ptr, ty.ptr.get(), &init.val, &table);
     if (error != nullptr) {
@@ -2708,8 +2702,8 @@ public:
   /// Stores a value into the specified index in this table.
   ///
   /// Returns an error if `idx` is out of bounds or if `val` has the wrong type.
-  [[nodiscard]] Result<std::monostate> set(Store::Context cx, uint32_t idx,
-                                           const Val &val) const {
+  Result<std::monostate> set(Store::Context cx, uint32_t idx,
+                             const Val &val) const {
     auto *error = wasmtime_table_set(cx.ptr, &table, idx, &val.val);
     if (error != nullptr) {
       return Error(error);
@@ -2725,8 +2719,8 @@ public:
   ///
   /// Returns an error if `init` has the wrong type for this table. Otherwise
   /// returns the previous size of the table before growth.
-  [[nodiscard]] Result<uint32_t> grow(Store::Context cx, uint32_t delta,
-                                      const Val &init) const {
+  Result<uint32_t> grow(Store::Context cx, uint32_t delta,
+                        const Val &init) const {
     uint32_t prev = 0;
     auto *error = wasmtime_table_grow(cx.ptr, &table, delta, &init.val, &prev);
     if (error != nullptr) {
@@ -2764,8 +2758,7 @@ public:
   Memory(wasmtime_memory_t memory) : memory(memory) {}
 
   /// Creates a new host-defined memory with the type specified.
-  [[nodiscard]] static Result<Memory> create(Store::Context cx,
-                                             const MemoryType &ty) {
+  static Result<Memory> create(Store::Context cx, const MemoryType &ty) {
     wasmtime_memory_t memory;
     auto *error = wasmtime_memory_new(cx.ptr, ty.ptr.get(), &memory);
     if (error != nullptr) {
@@ -2799,7 +2792,7 @@ public:
   ///
   /// On success returns the previous size of this memory in units of
   /// WebAssembly pages.
-  [[nodiscard]] Result<uint64_t> grow(Store::Context cx, uint64_t delta) const {
+  Result<uint64_t> grow(Store::Context cx, uint64_t delta) const {
     uint64_t prev = 0;
     auto *error = wasmtime_memory_grow(cx.ptr, &memory, delta, &prev);
     if (error != nullptr) {
@@ -2879,9 +2872,8 @@ public:
    * This function can return an error if any of the `imports` have the wrong
    * type, or if the wrong number of `imports` is provided.
    */
-  [[nodiscard]] static TrapResult<Instance>
-  create(Store::Context cx, const Module &m,
-         const std::vector<Extern> &imports) {
+  static TrapResult<Instance> create(Store::Context cx, const Module &m,
+                                     const std::vector<Extern> &imports) {
     std::vector<wasmtime_extern_t> raw_imports;
     for (const auto &item : imports) {
       raw_imports.push_back(wasmtime_extern_t{});
@@ -2974,8 +2966,8 @@ public:
   }
 
   /// Defines the provided item into this linker with the given name.
-  [[nodiscard]] Result<std::monostate>
-  define(Store::Context cx, std::string_view module, std::string_view name, const Extern &item) {
+  Result<std::monostate> define(Store::Context cx, std::string_view module,
+                                std::string_view name, const Extern &item) {
     wasmtime_extern_t raw;
     Instance::cvt(item, raw);
     auto *error =
@@ -2991,7 +2983,7 @@ public:
   ///
   /// Note that `Store::Context::set_wasi` must also be used for instantiated
   /// modules to have access to configured WASI state.
-  [[nodiscard]] Result<std::monostate> define_wasi() {
+  Result<std::monostate> define_wasi() {
     auto *error = wasmtime_linker_define_wasi(ptr.get());
     if (error != nullptr) {
       return Error(error);
@@ -3001,7 +2993,7 @@ public:
 
   /// Defines all exports of the `instance` provided in this linker with the
   /// given module name of `name`.
-  [[nodiscard]] Result<std::monostate>
+  Result<std::monostate>
   define_instance(Store::Context cx, std::string_view name, Instance instance) {
     auto *error = wasmtime_linker_define_instance(
         ptr.get(), cx.ptr, name.data(), name.size(), &instance.instance);
@@ -3013,8 +3005,7 @@ public:
 
   /// Instantiates the module `m` provided within the store `cx` using the items
   /// defined within this linker.
-  [[nodiscard]] TrapResult<Instance> instantiate(Store::Context cx,
-                                                 const Module &m) {
+  TrapResult<Instance> instantiate(Store::Context cx, const Module &m) {
     wasmtime_instance_t instance;
     wasm_trap_t *trap = nullptr;
     auto *error = wasmtime_linker_instantiate(ptr.get(), cx.ptr, m.ptr.get(),
@@ -3030,8 +3021,8 @@ public:
 
   /// Defines instantiations of the module `m` within this linker under the
   /// given `name`.
-  [[nodiscard]] Result<std::monostate>
-  module(Store::Context cx, std::string_view name, const Module &m) {
+  Result<std::monostate> module(Store::Context cx, std::string_view name,
+                                const Module &m) {
     auto *error = wasmtime_linker_module(ptr.get(), cx.ptr, name.data(),
                                          name.size(), m.ptr.get());
     if (error != nullptr) {
@@ -3059,9 +3050,9 @@ public:
                 std::is_invocable_r_v<Result<std::monostate, Trap>, F, Caller,
                                       Span<const Val>, Span<Val>>,
                 bool> = true>
-  [[nodiscard]] Result<std::monostate> func_new(std::string_view module,
-                                                std::string_view name,
-                                                const FuncType &ty, F f) {
+  Result<std::monostate> func_new(std::string_view module,
+                                  std::string_view name, const FuncType &ty,
+                                  F f) {
 
     auto *error = wasmtime_linker_define_func(
         ptr.get(), module.data(), module.length(), name.data(), name.length(),
@@ -3080,8 +3071,8 @@ public:
   template <typename F,
             std::enable_if_t<WasmHostFunc<F>::Params::valid, bool> = true,
             std::enable_if_t<WasmHostFunc<F>::Results::valid, bool> = true>
-  [[nodiscard]] Result<std::monostate> func_wrap(std::string_view module,
-                                                 std::string_view name, F f) {
+  Result<std::monostate> func_wrap(std::string_view module,
+                                   std::string_view name, F f) {
     using HostFunc = WasmHostFunc<F>;
     auto params = HostFunc::Params::types();
     auto results = HostFunc::Results::types();
@@ -3100,8 +3091,7 @@ public:
 
   /// Loads the "default" function, according to WASI commands and reactors, of
   /// the module named `name` in this linker.
-  [[nodiscard]] Result<Func> get_default(Store::Context cx,
-                                         std::string_view name) {
+  Result<Func> get_default(Store::Context cx, std::string_view name) {
     wasmtime_func_t item;
     auto *error = wasmtime_linker_get_default(ptr.get(), cx.ptr, name.data(),
                                               name.size(), &item);
