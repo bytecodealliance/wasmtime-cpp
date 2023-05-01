@@ -2517,8 +2517,8 @@ public:
         storage;
     WasmTypeList<Params>::store(cx, storage.data(), params);
     wasm_trap_t *trap = nullptr;
-    auto *error =
-        wasmtime_func_call_unchecked(cx.raw_context(), &f.func, storage.data(), &trap);
+    auto *error = wasmtime_func_call_unchecked(
+        cx.raw_context(), &f.func, storage.data(), storage.size(), &trap);
     if (error != nullptr) {
       return TrapError(Error(error));
     }
