@@ -19,6 +19,7 @@ TEST(Store, Smoke) {
   Store store3(std::move(store2));
 
   store = Store(engine);
+  store.limiter(-1, -1, -1, -1, -1);
   store.context().gc();
   EXPECT_EQ(store.context().fuel_consumed(), std::nullopt);
   store.context().add_fuel(1).err();

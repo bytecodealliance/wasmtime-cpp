@@ -1712,6 +1712,36 @@ public:
     wasmtime_context_t *raw_context() { return ptr; }
   };
 
+  /// \brief Provides limits for a store. Used by hosts to limit resource
+  /// consumption of instances. Use negative value to keep the default value
+  /// for the limit.
+  ///
+  /// \param memory_size the maximum number of bytes a linear memory can grow to.
+  /// Growing a linear memory beyond this limit will fail. By default,
+  /// linear memory will not be limited.
+  /// \param table_elements the maximum number of elements in a table.
+  /// Growing a table beyond this limit will fail. By default, table elements
+  /// will not be limited.
+  /// \param instances the maximum number of instances that can be created
+  /// for a Store. Module instantiation will fail if this limit is exceeded.
+  /// This value defaults to 10,000.
+  /// \param tables the maximum number of tables that can be created for a Store.
+  /// Module instantiation will fail if this limit is exceeded. This value
+  /// defaults to 10,000.
+  /// \param memories the maximum number of linear memories that can be created
+  /// for a Store. Instantiation will fail with an error if this limit is exceeded.
+  /// This value defaults to 10,000.
+  ///
+  /// Use any negative value for the parameters that should be kept on
+  /// the default values.
+  ///
+  /// Note that the limits are only used to limit the creation/growth of
+  /// resources in the future, this does not retroactively attempt to apply
+  /// limits to the store.
+  void limiter(int64_t memory_size, int64_t table_elements, int64_t instances, int64_t tables, int64_t memories) {
+    wasmtime_store_limiter(ptr.get(), memory_size, table_elements, instances, tables, memories);
+  }
+
   /// Explicit function to acquire a `Context` from this store.
   Context context() { return this; }
 };
