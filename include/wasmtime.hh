@@ -1716,7 +1716,6 @@ public:
   /// consumption of instances. Use negative value to keep the default value
   /// for the limit.
   ///
-  /// \param store store where the limits should be set.
   /// \param memory_size the maximum number of bytes a linear memory can grow to.
   /// Growing a linear memory beyond this limit will fail. By default,
   /// linear memory will not be limited.
