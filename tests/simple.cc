@@ -224,7 +224,7 @@ TEST(Global, Smoke) {
 TEST(Table, Smoke) {
   Engine engine;
   Store store(engine);
-  Table::create(store, TableType(ValKind::I32, 1), 3.0).err();
+  Table::create(store, TableType(ValKind::FuncRef, 1), 3.0).err();
 
   Val null = std::optional<Func>();
   Table t = unwrap(Table::create(store, TableType(ValKind::FuncRef, 1), null));
