@@ -42,8 +42,10 @@
 #include <optional>
 #include <variant>
 #include <vector>
-#ifdef __cpp_lib_span
+#ifdef __has_include
+#if __has_include(<span>)
 #include <span>
+#endif
 #endif
 
 #include "wasmtime.h"
