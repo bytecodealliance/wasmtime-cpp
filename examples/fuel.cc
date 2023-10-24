@@ -39,7 +39,7 @@ int main() {
   config.consume_fuel(true);
   Engine engine(std::move(config));
   Store store(engine);
-  store.context().add_fuel(kStoreFuel).unwrap();
+  store.context().set_fuel(kStoreFuel).unwrap();
 
   auto wat = readFile("examples/fuel.wat");
   Module module = Module::compile(engine, wat).unwrap();
@@ -48,16 +48,15 @@ int main() {
 
   // Call it repeatedly until it fails
   for (int32_t n = 1; ; n++) {
-    uint64_t fuel_before = *store.context().fuel_consumed();
     auto result = fib.call(store, {n});
     if (!result) {
       std::cout << "Exhausted fuel computing fib(" << n << ")\n";
       break;
     }
-    uint64_t consumed = *store.context().fuel_consumed() - fuel_before;;
+    uint64_t consumed = kStoreFuel - store.context().get_fuel().unwrap();
     auto fib_result = std::move(result).unwrap()[0].i32();
 
     std::cout << "fib(" << n << ") = " << fib_result << " [consumed " << consumed << " fuel]\n";
-    store.context().add_fuel(consumed).unwrap();
+    store.context().set_fuel(kStoreFuel).unwrap();
   }
 }

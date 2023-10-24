@@ -21,8 +21,8 @@ TEST(Store, Smoke) {
   store = Store(engine);
   store.limiter(-1, -1, -1, -1, -1);
   store.context().gc();
-  EXPECT_EQ(store.context().fuel_consumed(), std::nullopt);
-  store.context().add_fuel(1).err();
+  store.context().get_fuel().err();
+  store.context().set_fuel(1).err();
   store.context().set_epoch_deadline(1);
 }
 
