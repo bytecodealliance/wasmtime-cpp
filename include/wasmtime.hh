@@ -1656,8 +1656,8 @@ public:
     /// this is required if you want to let WebAssembly actually execute.
     ///
     /// Returns an error if fuel consumption isn't enabled.
-    Result<std::monostate> add_fuel(uint64_t fuel) {
-      auto *error = wasmtime_context_add_fuel(ptr, fuel);
+    Result<std::monostate> set_fuel(uint64_t fuel) {
+      auto *error = wasmtime_context_set_fuel(ptr, fuel);
       if (error != nullptr) {
         return Error(error);
       }
@@ -1667,12 +1667,13 @@ public:
     /// Returns the amount of fuel consumed so far by executing WebAssembly.
     ///
     /// Returns `std::nullopt` if fuel consumption is not enabled.
-    std::optional<uint64_t> fuel_consumed() const {
+    Result<uint64_t> get_fuel() const {
       uint64_t fuel = 0;
-      if (wasmtime_context_fuel_consumed(ptr, &fuel)) {
-        return fuel;
+      auto *error = wasmtime_context_get_fuel(ptr, &fuel);
+      if (error != nullptr) {
+        return Error(error);
       }
-      return std::nullopt;
+      return fuel;
     }
 
     /// Set user specified data associated with this store.
