@@ -69,7 +69,18 @@ inline constexpr size_t dynamic_extent =
  * @tparam T Type of data
  * @tparam Extent Static size of data refered by Span class
  */
-template <typename T, std::size_t Extent = dynamic_extent> class Span {
+template <typename T, std::size_t Extent = dynamic_extent> class Span;
+
+/// \brief Check whether a type is `Span`
+template <typename T> struct IsSpan : std::false_type {};
+
+template <typename T, std::size_t Extent>
+struct IsSpan<Span<T, Extent>> : std::true_type {};
+
+template <typename T, std::size_t Extent> class Span {
+  static_assert(Extent == dynamic_extent,
+                "The current implementation supports dynamic-extent span only");
+
 public:
   /// \brief Type used to iterate over this span (a raw pointer)
   using iterator = T *;
@@ -78,9 +89,10 @@ public:
   Span(T *t, std::size_t n) : ptr_{t}, size_{n} {}
 
   /// \brief Constructor of Span class for containers
-  template <template <typename, typename> class Container>
-  Span(Container<T, std::allocator<T>> &range)
-      : ptr_{range.data()}, size_{range.size()} {}
+  template <typename C, std::enable_if_t<!IsSpan<C>::value, int> = 0,
+            std::void_t<decltype(std::declval<C>().data()),
+                        decltype(std::declval<C>().size())> * = nullptr>
+  Span(C &range) : ptr_{range.data()}, size_{range.size()} {}
 
   /// \brief Returns item by index
   T &operator[](ptrdiff_t idx) const {
