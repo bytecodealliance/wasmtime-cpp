@@ -476,7 +476,7 @@ enum class ValKind {
 
 /// Helper X macro to construct statement for each enumerator in `ValKind`.
 /// X(enumerator in `ValKind`, name string, enumerator in `wasm_valkind_t`)
-#define FOR_EACH_VAL_KIND                                                      \
+#define WASMTIME_FOR_EACH_VAL_KIND                                             \
   X(I32, "i32", WASM_I32)                                                      \
   X(I64, "i64", WASM_I64)                                                      \
   X(F32, "f32", WASM_F32)                                                      \
@@ -492,7 +492,7 @@ inline std::ostream &operator<<(std::ostream &os, const ValKind &e) {
   case ValKind::kind:                                                          \
     os << name;                                                                \
     break;
-    FOR_EACH_VAL_KIND
+    WASMTIME_FOR_EACH_VAL_KIND
 #undef X
   default:
     abort();
@@ -521,7 +521,7 @@ class ValType {
 #define X(kind, ignore, ckind)                                                 \
   case ValKind::kind:                                                          \
     return ckind;
-      FOR_EACH_VAL_KIND
+      WASMTIME_FOR_EACH_VAL_KIND
 #undef X
     default:
       abort();
@@ -548,7 +548,7 @@ public:
 #define X(kind, ignore, ckind)                                                 \
   case ckind:                                                                  \
     return ValKind::kind;
-        FOR_EACH_VAL_KIND
+        WASMTIME_FOR_EACH_VAL_KIND
 #undef X
       }
       std::abort();
