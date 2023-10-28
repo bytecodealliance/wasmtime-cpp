@@ -474,30 +474,26 @@ enum class ValKind {
   FuncRef,
 };
 
+/// Helper X macro to construct statement for each enumerator in `ValKind`.
+/// X(enumerator in `ValKind`, name string, enumerator in `wasm_valkind_t`)
+#define FOR_EACH_VAL_KIND                                                      \
+  X(I32, "i32", WASM_I32)                                                      \
+  X(I64, "i64", WASM_I64)                                                      \
+  X(F32, "f32", WASM_F32)                                                      \
+  X(F64, "f64", WASM_F64)                                                      \
+  X(ExternRef, "externref", WASM_ANYREF)                                       \
+  X(FuncRef, "funcref", WASM_FUNCREF)                                          \
+  X(V128, "v128", WASMTIME_V128)
+
 /// \brief Used to print a ValKind.
 inline std::ostream &operator<<(std::ostream &os, const ValKind &e) {
   switch (e) {
-  case ValKind::I32:
-    os << "i32";
+#define X(kind, name, ignore)                                                  \
+  case ValKind::kind:                                                          \
+    os << name;                                                                \
     break;
-  case ValKind::I64:
-    os << "i64";
-    break;
-  case ValKind::F32:
-    os << "f32";
-    break;
-  case ValKind::F64:
-    os << "f64";
-    break;
-  case ValKind::ExternRef:
-    os << "externref";
-    break;
-  case ValKind::FuncRef:
-    os << "funcref";
-    break;
-  case ValKind::V128:
-    os << "v128";
-    break;
+    FOR_EACH_VAL_KIND
+#undef X
   default:
     abort();
   }
@@ -522,20 +518,11 @@ class ValType {
 
   static wasm_valkind_t kind_to_c(ValKind kind) {
     switch (kind) {
-    case ValKind::I32:
-      return WASM_I32;
-    case ValKind::I64:
-      return WASM_I64;
-    case ValKind::F32:
-      return WASM_F32;
-    case ValKind::F64:
-      return WASM_F64;
-    case ValKind::ExternRef:
-      return WASM_ANYREF;
-    case ValKind::FuncRef:
-      return WASM_FUNCREF;
-    case ValKind::V128:
-      return WASMTIME_V128;
+#define X(kind, ignore, ckind)                                                 \
+  case ValKind::kind:                                                          \
+    return ckind;
+      FOR_EACH_VAL_KIND
+#undef X
     default:
       abort();
     }
@@ -558,20 +545,11 @@ public:
     /// \brief Returns the corresponding "kind" for this type.
     ValKind kind() const {
       switch (wasm_valtype_kind(ptr)) {
-      case WASM_I32:
-        return ValKind::I32;
-      case WASM_I64:
-        return ValKind::I64;
-      case WASM_F32:
-        return ValKind::F32;
-      case WASM_F64:
-        return ValKind::F64;
-      case WASM_ANYREF:
-        return ValKind::ExternRef;
-      case WASM_FUNCREF:
-        return ValKind::FuncRef;
-      case WASMTIME_V128:
-        return ValKind::V128;
+#define X(kind, ignore, ckind)                                                 \
+  case ckind:                                                                  \
+    return ValKind::kind;
+        FOR_EACH_VAL_KIND
+#undef X
       }
       std::abort();
     }
@@ -1934,20 +1912,11 @@ public:
   /// Returns the kind of value that this value has.
   ValKind kind() const {
     switch (val.kind) {
-    case WASMTIME_I32:
-      return ValKind::I32;
-    case WASMTIME_I64:
-      return ValKind::I64;
-    case WASMTIME_F32:
-      return ValKind::F32;
-    case WASMTIME_F64:
-      return ValKind::F64;
-    case WASMTIME_FUNCREF:
-      return ValKind::FuncRef;
-    case WASMTIME_EXTERNREF:
-      return ValKind::ExternRef;
-    case WASMTIME_V128:
-      return ValKind::V128;
+#define X(kind, ignore, ckind)                                                 \
+  case ckind:                                                                  \
+    return ValKind::kind;
+      FOR_EACH_VAL_KIND
+#undef X
     }
     std::abort();
   }
