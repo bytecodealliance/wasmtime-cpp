@@ -1912,11 +1912,20 @@ public:
   /// Returns the kind of value that this value has.
   ValKind kind() const {
     switch (val.kind) {
-#define X(kind, ignore, ckind)                                                 \
-  case ckind:                                                                  \
-    return ValKind::kind;
-      FOR_EACH_VAL_KIND
-#undef X
+    case WASMTIME_I32:
+      return ValKind::I32;
+    case WASMTIME_I64:
+      return ValKind::I64;
+    case WASMTIME_F32:
+      return ValKind::F32;
+    case WASMTIME_F64:
+      return ValKind::F64;
+    case WASMTIME_FUNCREF:
+      return ValKind::FuncRef;
+    case WASMTIME_EXTERNREF:
+      return ValKind::ExternRef;
+    case WASMTIME_V128:
+      return ValKind::V128;
     }
     std::abort();
   }
