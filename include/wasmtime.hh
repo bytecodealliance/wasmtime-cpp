@@ -89,9 +89,17 @@ public:
   Span(T *t, std::size_t n) : ptr_{t}, size_{n} {}
 
   /// \brief Constructor of Span class for containers
-  template <typename C, std::enable_if_t<!IsSpan<C>::value, int> = 0,
-            std::void_t<decltype(std::declval<C>().data()),
-                        decltype(std::declval<C>().size())> * = nullptr>
+  template <typename C,
+            std::enable_if_t<
+                !IsSpan<C>::value &&
+                    std::is_pointer_v<decltype(std::declval<C &>().data())> &&
+                    std::is_convertible_v<
+                        std::remove_pointer_t<
+                            decltype(std::declval<C &>().data())> (*)[],
+                        T (*)[]> &&
+                    std::is_convertible_v<decltype(std::declval<C>().size()),
+                                          std::size_t>,
+                int> = 0>
   Span(C &range) : ptr_{range.data()}, size_{range.size()} {}
 
   /// \brief Returns item by index
