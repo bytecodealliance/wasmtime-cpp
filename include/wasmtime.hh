@@ -476,7 +476,7 @@ enum class ValKind {
 
 /// Helper X macro to construct statement for each enumerator in `ValKind`.
 /// X(enumerator in `ValKind`, name string, enumerator in `wasm_valkind_t`)
-#define WASMTIME_FOR_EACH_VAL_KIND                                             \
+#define WASMTIME_FOR_EACH_VAL_KIND(X)                                          \
   X(I32, "i32", WASM_I32)                                                      \
   X(I64, "i64", WASM_I64)                                                      \
   X(F32, "f32", WASM_F32)                                                      \
@@ -488,12 +488,12 @@ enum class ValKind {
 /// \brief Used to print a ValKind.
 inline std::ostream &operator<<(std::ostream &os, const ValKind &e) {
   switch (e) {
-#define X(kind, name, ignore)                                                  \
+#define CASE_KIND_PRINT_NAME(kind, name, ignore)                               \
   case ValKind::kind:                                                          \
     os << name;                                                                \
     break;
-    WASMTIME_FOR_EACH_VAL_KIND
-#undef X
+    WASMTIME_FOR_EACH_VAL_KIND(CASE_KIND_PRINT_NAME)
+#undef CASE_KIND_PRINT_NAME
   default:
     abort();
   }
@@ -518,11 +518,11 @@ class ValType {
 
   static wasm_valkind_t kind_to_c(ValKind kind) {
     switch (kind) {
-#define X(kind, ignore, ckind)                                                 \
+#define CASE_KIND_TO_C(kind, ignore, ckind)                                    \
   case ValKind::kind:                                                          \
     return ckind;
-      WASMTIME_FOR_EACH_VAL_KIND
-#undef X
+      WASMTIME_FOR_EACH_VAL_KIND(CASE_KIND_TO_C)
+#undef CASE_KIND_TO_C
     default:
       abort();
     }
@@ -545,11 +545,11 @@ public:
     /// \brief Returns the corresponding "kind" for this type.
     ValKind kind() const {
       switch (wasm_valtype_kind(ptr)) {
-#define X(kind, ignore, ckind)                                                 \
+#define CASE_C_TO_KIND(kind, ignore, ckind)                                    \
   case ckind:                                                                  \
     return ValKind::kind;
-        WASMTIME_FOR_EACH_VAL_KIND
-#undef X
+        WASMTIME_FOR_EACH_VAL_KIND(CASE_C_TO_KIND)
+#undef CASE_C_TO_KIND
       }
       std::abort();
     }
