@@ -17,7 +17,7 @@ jobs:
   doc:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     - run: curl -L https://www.doxygen.nl/files/doxygen-1.9.5.linux.bin.tar.gz | tar xzf -
     - run: echo "`pwd`/doxygen-1.9.5/bin" >> $GITHUB_PATH
     - run: doxygen doxygen.conf
@@ -84,7 +84,7 @@ jobs:
         - os: windows-latest
           config: Release
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
 
     # Download the c-api directory
     - run: |
