@@ -67,7 +67,7 @@ inline constexpr size_t dynamic_extent =
 /**
  * \brief Span class used when c++20 is not available
  * @tparam T Type of data
- * @tparam Extent Static size of data refered by Span class
+ * @tparam Extent Static size of data referred by Span class
  */
 template <typename T, std::size_t Extent = dynamic_extent> class Span;
 
@@ -652,7 +652,7 @@ public:
     const wasm_memorytype_t *ptr;
 
   public:
-    /// Creates a refernece from the raw C API representation.
+    /// Creates a reference from the raw C API representation.
     Ref(const wasm_memorytype_t *ptr) : ptr(ptr) {}
     /// Creates a reference from an original `MemoryType`.
     Ref(const MemoryType &ty) : Ref(ty.ptr.get()) {}
@@ -861,10 +861,10 @@ public:
             (wasm_mutability_t)(mut ? WASM_VAR : WASM_CONST))) {}
   /// Clones a reference into a uniquely owned global type.
   GlobalType(Ref other) : GlobalType(wasm_globaltype_copy(other.ptr)) {}
-  /// Copies othe type information into this one.
+  /// Copies other type information into this one.
   GlobalType(const GlobalType &other)
       : GlobalType(wasm_globaltype_copy(other.ptr.get())) {}
-  /// Copies othe type information into this one.
+  /// Copies other type information into this one.
   GlobalType &operator=(const GlobalType &other) {
     ptr.reset(wasm_globaltype_copy(other.ptr.get()));
     return *this;
@@ -939,9 +939,9 @@ public:
     return *this;
   }
   ~FuncType() = default;
-  /// Moves type information from anothe type into this one.
+  /// Moves type information from another type into this one.
   FuncType(FuncType &&other) = default;
-  /// Moves type information from anothe type into this one.
+  /// Moves type information from another type into this one.
   FuncType &operator=(FuncType &&other) = default;
 
   /// Creates a new function type from the given list of parameters and results.
@@ -3063,7 +3063,7 @@ public:
   }
 
   /// Attempts to load the specified named item from this linker, returning
-  /// `std::nullopt` if it was not defiend.
+  /// `std::nullopt` if it was not defined.
   [[nodiscard]] std::optional<Extern>
   get(Store::Context cx, std::string_view module, std::string_view name) {
     wasmtime_extern_t item;

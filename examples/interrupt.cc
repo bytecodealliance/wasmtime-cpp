@@ -36,7 +36,7 @@ std::string readFile(const char* name) {
 }
 
 int main() {
-  // Enable interruptable code via `Config` and then create an interrupt
+  // Enable interruptible code via `Config` and then create an interrupt
   // handle which we'll use later to interrupt running code.
   Config config;
   config.epoch_interruption(true);
