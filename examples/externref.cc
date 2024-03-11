@@ -14,6 +14,7 @@ std::string readFile(const char* name) {
 }
 
 int main() {
+#if WASMTIME_HAS_EXTERNREF
   std::cout << "Initializing...\n";
   Engine engine;
   Store store(engine);
@@ -49,4 +50,7 @@ int main() {
 
   std::cout << "Running a gc..\n";
   store.context().gc();
+#else
+  std::cout << "no support for externref at compile time\n";
+#endif
 }

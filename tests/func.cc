@@ -71,6 +71,7 @@ TEST(TypedFunc, Call) {
     EXPECT_EQ(std::get<1>(result), 4);
   }
 
+#if WASMTIME_HAS_EXTERNREF
   {
     FuncType ty({ValKind::ExternRef, ValKind::ExternRef}, {ValKind::ExternRef, ValKind::ExternRef});
     Func f(store, ty, [](auto caller, auto params, auto results) {
@@ -91,6 +92,7 @@ TEST(TypedFunc, Call) {
     EXPECT_EQ(std::any_cast<int>(std::get<0>(result)->data()), 3);
     EXPECT_EQ(std::get<1>(result), std::nullopt);
   }
+#endif
 
   {
     Func f2(store, FuncType({}, {}), [](auto caller, auto params, auto results) {
@@ -178,8 +180,10 @@ TEST(TypedFunc, WrapAndTypes) {
   assert_func_type(f.type(store), {}, {ValKind::I32, ValKind::I32});
   f = Func::wrap(store, []() { return std::optional<Func>(std::nullopt); });
   assert_func_type(f.type(store), {}, {ValKind::FuncRef});
+#if WASMTIME_HAS_EXTERNREF
   f = Func::wrap(store, []() { return std::optional<ExternRef>(std::nullopt); });
   assert_func_type(f.type(store), {}, {ValKind::ExternRef});
+#endif
   f = Func::wrap(store, []() { return Result<std::monostate, Trap>(std::monostate()); });
   assert_func_type(f.type(store), {}, {});
   f = Func::wrap(store, []() { return Result<int32_t, Trap>(1); });
@@ -201,8 +205,10 @@ TEST(TypedFunc, WrapAndTypes) {
   assert_func_type(f.type(store), {ValKind::V128}, {});
   f = Func::wrap(store, [](std::optional<Func> a) {});
   assert_func_type(f.type(store), {ValKind::FuncRef}, {});
+#if WASMTIME_HAS_EXTERNREF
   f = Func::wrap(store, [](std::optional<ExternRef> a) {});
   assert_func_type(f.type(store), {ValKind::ExternRef}, {});
+#endif
   f = Func::wrap(store, [](Caller a) {});
   assert_func_type(f.type(store), {}, {});
   f = Func::wrap(store, [](Caller a, int32_t b) {});
