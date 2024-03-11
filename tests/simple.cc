@@ -20,7 +20,9 @@ TEST(Store, Smoke) {
 
   store = Store(engine);
   store.limiter(-1, -1, -1, -1, -1);
+#if WASMTIME_HAS_EXTERNREF
   store.context().gc();
+#endif
   store.context().get_fuel().err();
   store.context().set_fuel(1).err();
   store.context().set_epoch_deadline(1);
@@ -136,6 +138,7 @@ TEST(WasiConfig, Smoke) {
   EXPECT_FALSE(config.preopen_dir("nonexistent", "nonexistent"));
 }
 
+#if WASMTIME_HAS_EXTERNREF
 TEST(ExternRef, Smoke) {
   ExternRef a("foo");
   ExternRef b(3);
@@ -143,6 +146,7 @@ TEST(ExternRef, Smoke) {
   EXPECT_EQ(std::any_cast<int>(b.data()), 3);
   a = b;
 }
+#endif
 
 TEST(Val, Smoke) {
   Val val(1);
@@ -171,6 +175,7 @@ TEST(Val, Smoke) {
     EXPECT_EQ(val.v128().v128[i], 0);
   }
 
+#if WASMTIME_HAS_EXTERNREF
   val = std::optional<ExternRef>(std::nullopt);
   EXPECT_EQ(val.kind(), ValKind::ExternRef);
   EXPECT_EQ(val.externref(), std::nullopt);
@@ -182,6 +187,7 @@ TEST(Val, Smoke) {
   val = ExternRef(5);
   EXPECT_EQ(val.kind(), ValKind::ExternRef);
   EXPECT_EQ(std::any_cast<int>(val.externref()->data()), 5);
+#endif
 
   val = std::optional<Func>(std::nullopt);
   EXPECT_EQ(val.kind(), ValKind::FuncRef);
@@ -198,9 +204,6 @@ TEST(Val, Smoke) {
 
   val = func;
   EXPECT_EQ(val.kind(), ValKind::FuncRef);
-
-  Val other(1);
-  val = other;
 }
 
 TEST(Global, Smoke) {

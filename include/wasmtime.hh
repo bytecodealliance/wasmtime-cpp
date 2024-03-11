@@ -50,6 +50,10 @@
 
 #include "wasmtime.h"
 
+#ifndef WASMTIME_HAS_EXTERNREF
+#define WASMTIME_HAS_EXTERNREF 0
+#endif
+
 namespace wasmtime {
 
 #ifdef __cpp_lib_span
@@ -488,12 +492,15 @@ enum class ValKind {
   F64,
   /// WebAssembly's `v128` type from the simd proposal
   V128,
+#if WASMTIME_HAS_EXTERNREF
   /// WebAssembly's `externref` type from the reference types
   ExternRef,
+#endif
   /// WebAssembly's `funcref` type from the reference types
   FuncRef,
 };
 
+#if WASMTIME_HAS_EXTERNREF
 /// Helper X macro to construct statement for each enumerator in `ValKind`.
 /// X(enumerator in `ValKind`, name string, enumerator in `wasm_valkind_t`)
 #define WASMTIME_FOR_EACH_VAL_KIND(X)                                          \
@@ -504,6 +511,17 @@ enum class ValKind {
   X(ExternRef, "externref", WASM_ANYREF)                                       \
   X(FuncRef, "funcref", WASM_FUNCREF)                                          \
   X(V128, "v128", WASMTIME_V128)
+#else
+/// Helper X macro to construct statement for each enumerator in `ValKind`.
+/// X(enumerator in `ValKind`, name string, enumerator in `wasm_valkind_t`)
+#define WASMTIME_FOR_EACH_VAL_KIND(X)                                          \
+  X(I32, "i32", WASM_I32)                                                      \
+  X(I64, "i64", WASM_I64)                                                      \
+  X(F32, "f32", WASM_F32)                                                      \
+  X(F64, "f64", WASM_F64)                                                      \
+  X(FuncRef, "funcref", WASM_FUNCREF)                                          \
+  X(V128, "v128", WASMTIME_V128)
+#endif
 
 /// \brief Used to print a ValKind.
 inline std::ostream &operator<<(std::ostream &os, const ValKind &e) {
@@ -1644,9 +1662,11 @@ public:
     /// Creates a context referencing the provided `Caller`.
     Context(Caller *caller);
 
+#if WASMTIME_HAS_EXTERNREF
     /// Runs a garbage collection pass in the referenced store to collect loose
     /// `externref` values, if any are available.
     void gc() { wasmtime_context_gc(ptr); }
+#endif
 
     /// Injects fuel to be consumed within this store.
     ///
@@ -1747,6 +1767,7 @@ public:
   Context context() { return this; }
 };
 
+#if WASMTIME_HAS_EXTERNREF
 /**
  * \brief Representation of a WebAssembly `externref` value.
  *
@@ -1810,6 +1831,7 @@ public:
   /// This class still retains ownership of the pointer.
   wasmtime_externref_t *raw() const { return ptr.get(); }
 };
+#endif
 
 class Func;
 class Global;
@@ -1885,6 +1907,7 @@ public:
   Val(std::optional<Func> func);
   /// Creates a new `funcref` WebAssembly value which is not `ref.null func`.
   Val(Func func);
+#if WASMTIME_HAS_EXTERNREF
   /// Creates a new `externref` value.
   Val(std::optional<ExternRef> ptr) : val{} {
     val.kind = WASMTIME_EXTERNREF;
@@ -1896,12 +1919,7 @@ public:
   /// Creates a new `externref` WebAssembly value which is not `ref.null
   /// extern`.
   Val(ExternRef ptr);
-  /// Copies the contents of another value into this one.
-  Val(const Val &other) : val{} {
-    val.kind = WASMTIME_I32;
-    val.of.i32 = 0;
-    wasmtime_val_copy(&val, &other.val);
-  }
+#endif
   /// Moves the resources from another value into this one.
   Val(Val &&other) noexcept : val{} {
     val.kind = WASMTIME_I32;
@@ -1909,20 +1927,14 @@ public:
     std::swap(val, other.val);
   }
 
+#if WASMTIME_HAS_EXTERNREF
   ~Val() {
     if (val.kind == WASMTIME_EXTERNREF && val.of.externref != nullptr) {
       wasmtime_externref_delete(val.of.externref);
     }
   }
+#endif
 
-  /// Copies the contents of another value into this one.
-  Val &operator=(const Val &other) noexcept {
-    if (val.kind == WASMTIME_EXTERNREF && val.of.externref != nullptr) {
-      wasmtime_externref_delete(val.of.externref);
-    }
-    wasmtime_val_copy(&val, &other.val);
-    return *this;
-  }
   /// Moves the resources from another value into this one.
   Val &operator=(Val &&other) noexcept {
     std::swap(val, other.val);
@@ -1942,8 +1954,10 @@ public:
       return ValKind::F64;
     case WASMTIME_FUNCREF:
       return ValKind::FuncRef;
+#if WASMTIME_HAS_EXTERNREF
     case WASMTIME_EXTERNREF:
       return ValKind::ExternRef;
+#endif
     case WASMTIME_V128:
       return ValKind::V128;
     }
@@ -1995,6 +2009,7 @@ public:
     return val.of.v128;
   }
 
+#if WASMTIME_HAS_EXTERNREF
   /// Returns the underlying `externref`, requires `kind() == KindExternRef` or
   /// aborts the process.
   ///
@@ -2009,6 +2024,7 @@ public:
     }
     return std::nullopt;
   }
+#endif
 
   /// Returns the underlying `funcref`, requires `kind() == KindFuncRef` or
   /// aborts the process.
@@ -2077,6 +2093,7 @@ NATIVE_WASM_TYPE(double, F64, f64)
 
 #undef NATIVE_WASM_TYPE
 
+#if WASMTIME_HAS_EXTERNREF
 /// Type information for `externref`, represented on the host as an optional
 /// `ExternRef`.
 template <> struct WasmType<std::optional<ExternRef>> {
@@ -2099,6 +2116,7 @@ template <> struct WasmType<std::optional<ExternRef>> {
         wasmtime_externref_from_raw(cx.raw_context(), p->externref));
   }
 };
+#endif
 
 /// Type information for the `V128` host value used as a wasm value.
 template <> struct WasmType<V128> {
@@ -2454,12 +2472,14 @@ public:
    * > signature is statically known it's recommended to use `Func::typed` and
    * > `TypedFunc::call`.
    */
+  template<typename I>
   TrapResult<std::vector<Val>> call(Store::Context cx,
-                                    const std::vector<Val> &params) const {
+                                    const I &begin,
+                                    const I &end) const {
     std::vector<wasmtime_val_t> raw_params;
-    raw_params.reserve(params.size());
-    for (const auto &param : params) {
-      raw_params.push_back(param.val);
+    raw_params.reserve(end - begin);
+    for (auto i = begin; i != end; i++) {
+      raw_params.push_back(i->val);
     }
     size_t nresults = this->type(cx)->results().size();
     std::vector<wasmtime_val_t> raw_results(nresults);
@@ -2481,6 +2501,16 @@ public:
       results.push_back(raw_results[i]);
     }
     return results;
+  }
+
+  TrapResult<std::vector<Val>> call(Store::Context cx,
+                                    const std::vector<Val> &params) const {
+    return this->call(cx, params.begin(), params.end());
+  }
+
+  TrapResult<std::vector<Val>> call(Store::Context cx,
+                                    const std::initializer_list<Val> &params) const {
+    return this->call(cx, params.begin(), params.end());
   }
 
   /// Returns the type of this function.
@@ -2573,7 +2603,9 @@ inline Val::Val(std::optional<Func> func) : val{} {
 }
 
 inline Val::Val(Func func) : Val(std::optional(func)) {}
+#if WASMTIME_HAS_EXTERNREF
 inline Val::Val(ExternRef ptr) : Val(std::optional(ptr)) {}
+#endif
 
 inline std::optional<Func> Val::funcref() const {
   if (val.kind != WASMTIME_FUNCREF) {

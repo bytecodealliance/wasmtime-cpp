@@ -19,7 +19,9 @@ TEST(ValType, Smoke) {
   EXPECT_EQ(ValType(ValKind::F64)->kind(), ValKind::F64);
   EXPECT_EQ(ValType(ValKind::V128)->kind(), ValKind::V128);
   EXPECT_EQ(ValType(ValKind::FuncRef)->kind(), ValKind::FuncRef);
+#if WASMTIME_HAS_EXTERNREF
   EXPECT_EQ(ValType(ValKind::ExternRef)->kind(), ValKind::ExternRef);
+#endif
 
   ValType t(ValKind::I32);
   t = ValKind::I64;
