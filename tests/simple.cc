@@ -135,7 +135,13 @@ TEST(WasiConfig, Smoke) {
   config.inherit_stdout();
   EXPECT_FALSE(config.stderr_file("path/to/nonexistent"));
   config.inherit_stderr();
-  EXPECT_FALSE(config.preopen_dir("nonexistent", "nonexistent"));
+
+  WasiConfig config2;
+  if (config2.preopen_dir("nonexistent", "nonexistent")) {
+    Engine engine;
+    Store store(engine);
+    EXPECT_FALSE(store.context().set_wasi(std::move(config2)));
+  }
 }
 
 #if WASMTIME_HAS_EXTERNREF
