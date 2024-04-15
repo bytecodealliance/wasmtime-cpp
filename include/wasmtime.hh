@@ -2322,6 +2322,8 @@ class Func {
   static wasm_trap_t *raw_callback(void *env, wasmtime_caller_t *caller,
                                    const wasmtime_val_t *args, size_t nargs,
                                    wasmtime_val_t *results, size_t nresults) {
+    static_assert(alignof(Val) == alignof(wasmtime_val_t));
+    static_assert(sizeof(Val) == sizeof(wasmtime_val_t));
     F *func = reinterpret_cast<F *>(env);                          // NOLINT
     Span<const Val> args_span(reinterpret_cast<const Val *>(args), // NOLINT
                               nargs);
