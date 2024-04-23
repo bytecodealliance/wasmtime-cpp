@@ -37,6 +37,7 @@
 #include <cstdio>
 #include <initializer_list>
 #include <iosfwd>
+#include <iostream>
 #include <limits>
 #include <memory>
 #include <optional>
