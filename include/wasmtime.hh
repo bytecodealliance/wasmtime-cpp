@@ -1740,15 +1740,20 @@ public:
   /// \param memory_size the maximum number of bytes a linear memory can grow
   /// to. Growing a linear memory beyond this limit will fail. By default,
   /// linear memory will not be limited.
+  ///
   /// \param table_elements the maximum number of elements in a table.
   /// Growing a table beyond this limit will fail. By default, table elements
   /// will not be limited.
+  ///
   /// \param instances the maximum number of instances that can be created
   /// for a Store. Module instantiation will fail if this limit is exceeded.
   /// This value defaults to 10,000.
+  ///
   /// \param tables the maximum number of tables that can be created for a
   /// Store. Module instantiation will fail if this limit is exceeded. This
-  /// value defaults to 10,000. \param memories the maximum number of linear
+  /// value defaults to 10,000.
+  ///
+  /// \param memories the maximum number of linear
   /// memories that can be created for a Store. Instantiation will fail with an
   /// error if this limit is exceeded. This value defaults to 10,000.
   ///
