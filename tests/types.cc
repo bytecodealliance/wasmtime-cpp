@@ -3,8 +3,7 @@
 
 using namespace wasmtime;
 
-template<typename T, typename E>
-T unwrap(Result<T, E> result) {
+template <typename T, typename E> T unwrap(Result<T, E> result) {
   if (result) {
     return result.ok();
   }
@@ -88,12 +87,11 @@ TEST(ModuleType, Smoke) {
   EXPECT_EQ(module.imports().size(), 0);
   EXPECT_EQ(module.exports().size(), 0);
 
-  module = unwrap(Module::compile(engine,
-    "(module"
-      "(import \"a\" \"b\" (func))"
-      "(global (export \"x\") i32 (i32.const 0))"
-    ")"
-  ));
+  module =
+      unwrap(Module::compile(engine, "(module"
+                                     "(import \"a\" \"b\" (func))"
+                                     "(global (export \"x\") i32 (i32.const 0))"
+                                     ")"));
 
   auto imports = module.imports();
   EXPECT_EQ(imports.size(), 1);
@@ -104,7 +102,8 @@ TEST(ModuleType, Smoke) {
   EXPECT_EQ(import_ty.params().size(), 0);
   EXPECT_EQ(import_ty.results().size(), 0);
 
-  for (auto &imp : imports) {}
+  for (auto &imp : imports) {
+  }
 
   auto exports = module.exports();
   EXPECT_EQ(exports.size(), 1);
@@ -114,7 +113,8 @@ TEST(ModuleType, Smoke) {
   EXPECT_EQ(export_ty.content().kind(), ValKind::I32);
   EXPECT_FALSE(export_ty.is_mutable());
 
-  for (auto &exp : exports) {}
+  for (auto &exp : exports) {
+  }
 
   auto other_imports = module.imports();
   other_imports = std::move(imports);

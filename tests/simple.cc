@@ -3,8 +3,7 @@
 
 using namespace wasmtime;
 
-template<typename T, typename E>
-T unwrap(Result<T, E> result) {
+template <typename T, typename E> T unwrap(Result<T, E> result) {
   if (result) {
     return result.ok();
   }
@@ -70,7 +69,8 @@ TEST(Trap, Smoke) {
   EXPECT_EQ(t.trace().size(), 0);
 
   Engine engine;
-  Module m = unwrap(Module::compile(engine, "(module (func (export \"\") unreachable))"));
+  Module m = unwrap(
+      Module::compile(engine, "(module (func (export \"\") unreachable))"));
   Store store(engine);
   Instance i = unwrap(Instance::create(store, m, {}));
   auto func = std::get<Func>(*i.get(store, ""));
@@ -83,10 +83,13 @@ TEST(Trap, Smoke) {
   EXPECT_EQ(frame.func_index(), 0);
   EXPECT_EQ(frame.func_offset(), 1);
   EXPECT_EQ(frame.module_offset(), 29);
-  for (auto &frame : trace) {}
+  for (auto &frame : trace) {
+  }
 
-  EXPECT_TRUE(func.call(store, {}).err().message().find("unreachable") != std::string::npos);
-  EXPECT_EQ(func.call(store, {1}).err().message(), "expected 0 arguments, got 1");
+  EXPECT_TRUE(func.call(store, {}).err().message().find("unreachable") !=
+              std::string::npos);
+  EXPECT_EQ(func.call(store, {1}).err().message(),
+            "expected 0 arguments, got 1");
 }
 
 TEST(Module, Smoke) {
@@ -148,7 +151,7 @@ TEST(WasiConfig, Smoke) {
 TEST(ExternRef, Smoke) {
   ExternRef a("foo");
   ExternRef b(3);
-  EXPECT_STREQ(std::any_cast<const char*>(a.data()), "foo");
+  EXPECT_STREQ(std::any_cast<const char *>(a.data()), "foo");
   EXPECT_EQ(std::any_cast<int>(b.data()), 3);
   a = b;
 }
@@ -159,19 +162,19 @@ TEST(Val, Smoke) {
   EXPECT_EQ(val.kind(), ValKind::I32);
   EXPECT_EQ(val.i32(), 1);
 
-  val = (int32_t) 3;
+  val = (int32_t)3;
   EXPECT_EQ(val.kind(), ValKind::I32);
   EXPECT_EQ(val.i32(), 3);
 
-  val = (int64_t) 4;
+  val = (int64_t)4;
   EXPECT_EQ(val.kind(), ValKind::I64);
   EXPECT_EQ(val.i64(), 4);
 
-  val = (float) 5;
+  val = (float)5;
   EXPECT_EQ(val.kind(), ValKind::F32);
   EXPECT_EQ(val.f32(), 5);
 
-  val = (double) 6;
+  val = (double)6;
   EXPECT_EQ(val.kind(), ValKind::F64);
   EXPECT_EQ(val.f64(), 6);
 
@@ -201,9 +204,11 @@ TEST(Val, Smoke) {
 
   Engine engine;
   Store store(engine);
-  Func func(store, FuncType({}, {}), [](auto caller, auto params, auto results) -> auto {
-    return std::monostate();
-  });
+  Func func(
+      store, FuncType({}, {}),
+      [](auto caller, auto params, auto results) -> auto{
+        return std::monostate();
+      });
 
   val = std::optional<Func>(func);
   EXPECT_EQ(val.kind(), ValKind::FuncRef);
@@ -264,24 +269,26 @@ TEST(Instance, Smoke) {
   Store store(engine);
   Memory m = unwrap(Memory::create(store, MemoryType(1)));
   Global g = unwrap(Global::create(store, GlobalType(ValKind::I32, false), 1));
-  Table t = unwrap(Table::create(store, TableType(ValKind::FuncRef, 1), std::optional<Func>()));
-  Func f(store, FuncType({}, {}), [](auto caller, auto params, auto results) -> auto {
-    return std::monostate();
-  });
+  Table t = unwrap(Table::create(store, TableType(ValKind::FuncRef, 1),
+                                 std::optional<Func>()));
+  Func f(
+      store, FuncType({}, {}),
+      [](auto caller, auto params, auto results) -> auto{
+        return std::monostate();
+      });
 
-  Module mod = unwrap(Module::compile(engine,
-    "(module"
-      "(import \"\" \"\" (func))"
-      "(import \"\" \"\" (global i32))"
-      "(import \"\" \"\" (table 1 funcref))"
-      "(import \"\" \"\" (memory 1))"
+  Module mod =
+      unwrap(Module::compile(engine, "(module"
+                                     "(import \"\" \"\" (func))"
+                                     "(import \"\" \"\" (global i32))"
+                                     "(import \"\" \"\" (table 1 funcref))"
+                                     "(import \"\" \"\" (memory 1))"
 
-      "(func (export \"f\"))"
-      "(global (export \"g\") i32 (i32.const 0))"
-      "(export \"m\" (memory 0))"
-      "(export \"t\" (table 0))"
-    ")"
-  ));
+                                     "(func (export \"f\"))"
+                                     "(global (export \"g\") i32 (i32.const 0))"
+                                     "(export \"m\" (memory 0))"
+                                     "(export \"t\" (table 0))"
+                                     ")"));
   Instance::create(store, mod, {}).err();
   Instance i = unwrap(Instance::create(store, mod, {f, g, t, m}));
   EXPECT_FALSE(i.get(store, "not-present"));
@@ -309,12 +316,12 @@ TEST(Linker, Smoke) {
   unwrap(linker.define_wasi());
   unwrap(linker.func_new(
       "a", "f", FuncType({}, {}),
-      [](auto caller, auto params, auto results) -> auto {
+      [](auto caller, auto params, auto results) -> auto{
         return std::monostate();
       }));
-  unwrap(linker.func_wrap("a", "f2", [](){}));
-  unwrap(linker.func_wrap("a", "f3", [](Caller arg){}));
-  unwrap(linker.func_wrap("a", "f4", [](Caller arg, int32_t a){}));
+  unwrap(linker.func_wrap("a", "f2", []() {}));
+  unwrap(linker.func_wrap("a", "f3", [](Caller arg) {}));
+  unwrap(linker.func_wrap("a", "f4", [](Caller arg, int32_t a) {}));
   Module mod = unwrap(Module::compile(engine, "(module)"));
   Instance i = unwrap(Instance::create(store, mod, {}));
   unwrap(linker.define_instance(store, "x", i));
@@ -329,25 +336,29 @@ TEST(Linker, Smoke) {
 TEST(Caller, Smoke) {
   Engine engine;
   Store store(engine);
-  Func f(store, FuncType({}, {}), [](auto caller, auto params, auto results) -> auto {
-    EXPECT_FALSE(caller.get_export("foo"));
-    return std::monostate();
-  });
+  Func f(
+      store, FuncType({}, {}),
+      [](auto caller, auto params, auto results) -> auto{
+        EXPECT_FALSE(caller.get_export("foo"));
+        return std::monostate();
+      });
   unwrap(f.call(store, {}));
 
   Module m = unwrap(Module::compile(engine, "(module "
-    "(import \"\" \"\" (func))"
-    "(memory (export \"m\") 1)"
-    "(func (export \"f\") call 0)"
-  ")"));
-  Func f2(store, FuncType({}, {}), [](auto caller, auto params, auto results) -> auto {
-    EXPECT_FALSE(caller.get_export("foo"));
-    EXPECT_TRUE(caller.get_export("m"));
-    EXPECT_TRUE(caller.get_export("f"));
-    Memory m = std::get<Memory>(*caller.get_export("m"));
-    EXPECT_EQ(m.type(caller)->min(), 1);
-    return std::monostate();
-  });
+                                            "(import \"\" \"\" (func))"
+                                            "(memory (export \"m\") 1)"
+                                            "(func (export \"f\") call 0)"
+                                            ")"));
+  Func f2(
+      store, FuncType({}, {}),
+      [](auto caller, auto params, auto results) -> auto{
+        EXPECT_FALSE(caller.get_export("foo"));
+        EXPECT_TRUE(caller.get_export("m"));
+        EXPECT_TRUE(caller.get_export("f"));
+        Memory m = std::get<Memory>(*caller.get_export("m"));
+        EXPECT_EQ(m.type(caller)->min(), 1);
+        return std::monostate();
+      });
   Instance i = unwrap(Instance::create(store, m, {f2}));
   f = std::get<Func>(*i.get(store, "f"));
   unwrap(f.call(store, {}));
@@ -356,14 +367,18 @@ TEST(Caller, Smoke) {
 TEST(Func, Smoke) {
   Engine engine;
   Store store(engine);
-  Func f(store, FuncType({}, {}), [](auto caller, auto params, auto results) -> auto {
-    return std::monostate();
-  });
+  Func f(
+      store, FuncType({}, {}),
+      [](auto caller, auto params, auto results) -> auto{
+        return std::monostate();
+      });
   unwrap(f.call(store, {}));
 
-  Func f2(store, FuncType({}, {}), [](auto caller, auto params, auto results) -> auto {
-    return Trap("message");
-  });
+  Func f2(
+      store, FuncType({}, {}),
+      [](auto caller, auto params, auto results) -> auto{
+        return Trap("message");
+      });
   EXPECT_EQ(f2.call(store, {}).err().message(), "message");
 }
 
@@ -372,75 +387,97 @@ TEST(Data, Smoke) {
   Engine engine;
   Store store(engine);
   store.context().set_data(10);
-  Func f0(store, FuncType({}, {}), [](auto caller, auto params, auto results) -> Result<std::monostate,Trap> {
-    auto data = std::any_cast<int>(caller.context().get_data());
-    if (data != 10) {
-      return Trap("message");
-    }
-    return std::monostate();
-  });
+  Func f0(store, FuncType({}, {}),
+          [](auto caller, auto params,
+             auto results) -> Result<std::monostate, Trap> {
+            auto data = std::any_cast<int>(caller.context().get_data());
+            if (data != 10) {
+              return Trap("message");
+            }
+            return std::monostate();
+          });
   unwrap(f0.call(store, {}));
 
   store.context().set_data(std::make_pair<int, int>(10, -3));
-  Func f1(store, FuncType({}, {}), [](auto caller, auto params, auto results) -> Result<std::monostate,Trap> {
-    auto data = std::any_cast<std::pair<int, int>>(caller.context().get_data());
-    if (data.first != 10 || data.second != -3) {
-      return Trap("message");
-    }
-    return std::monostate();
-  });
+  Func f1(store, FuncType({}, {}),
+          [](auto caller, auto params,
+             auto results) -> Result<std::monostate, Trap> {
+            auto data =
+                std::any_cast<std::pair<int, int>>(caller.context().get_data());
+            if (data.first != 10 || data.second != -3) {
+              return Trap("message");
+            }
+            return std::monostate();
+          });
   unwrap(f1.call(store, {}));
 
   store.context().set_data(std::string("hello world"));
-  Func f2(store, FuncType({}, {}), [](auto caller, auto params, auto results) -> Result<std::monostate,Trap> {
-    auto data = std::any_cast<std::string>(caller.context().get_data());
-    if (data != "hello world") {
-      return Trap("message");
-    }
-    return std::monostate();
-  });
+  Func f2(store, FuncType({}, {}),
+          [](auto caller, auto params,
+             auto results) -> Result<std::monostate, Trap> {
+            auto data = std::any_cast<std::string>(caller.context().get_data());
+            if (data != "hello world") {
+              return Trap("message");
+            }
+            return std::monostate();
+          });
   unwrap(f2.call(store, {}));
 
   struct test_object {
     test_object() : v(nullptr) {}
     test_object(int i) : v(new int(i)) {}
-    test_object(const test_object &other) : v((other.v) ? new int(*other.v) : nullptr) {}
+    test_object(const test_object &other)
+        : v((other.v) ? new int(*other.v) : nullptr) {}
     test_object(test_object &&other) : v(other.v) { other.v = nullptr; }
-    ~test_object() { if (v) { delete v; v = nullptr; } }
-    int* v;
+    ~test_object() {
+      if (v) {
+        delete v;
+        v = nullptr;
+      }
+    }
+    int *v;
   };
 
   test_object data(7);
   store.context().set_data(&data); // by pointer
-  Func f3(store, FuncType({}, {}), [](auto caller, auto params, auto results) -> Result<std::monostate,Trap> {
-      auto data = std::any_cast<test_object *>(caller.context().get_data());
-      if (*data->v != 7 ) {
-	return Trap("message");
-      }
-      return std::monostate();
-    });
+  Func f3(store, FuncType({}, {}),
+          [](auto caller, auto params,
+             auto results) -> Result<std::monostate, Trap> {
+            auto data =
+                std::any_cast<test_object *>(caller.context().get_data());
+            if (*data->v != 7) {
+              return Trap("message");
+            }
+            return std::monostate();
+          });
   unwrap(f3.call(store, {}));
   EXPECT_EQ(*data.v, 7);
 
   store.context().set_data(data); // by copy
-  Func f4(store, FuncType({}, {}), [](auto caller, auto params, auto results) -> Result<std::monostate,Trap> {
-      auto data = std::any_cast<test_object &>(caller.context().get_data());
-      if (*data.v != 7 ) {
-	return Trap("message");
-      }
-      return std::monostate();
-    });
+  Func f4(store, FuncType({}, {}),
+          [](auto caller, auto params,
+             auto results) -> Result<std::monostate, Trap> {
+            auto data =
+                std::any_cast<test_object &>(caller.context().get_data());
+            if (*data.v != 7) {
+              return Trap("message");
+            }
+            return std::monostate();
+          });
   unwrap(f4.call(store, {}));
   EXPECT_EQ(*data.v, 7);
 
   store.context().set_data(std::move(data)); // by move
-  Func f5(store, FuncType({}, {}), [](auto caller, auto params, auto results) -> Result<std::monostate,Trap> {
-      auto data = std::any_cast<test_object &>(caller.context().get_data());
-      if (*data.v != 7 ) {
-	return Trap("message");
-      }
-      return std::monostate();
-    });
+  Func f5(store, FuncType({}, {}),
+          [](auto caller, auto params,
+             auto results) -> Result<std::monostate, Trap> {
+            auto data =
+                std::any_cast<test_object &>(caller.context().get_data());
+            if (*data.v != 7) {
+              return Trap("message");
+            }
+            return std::monostate();
+          });
   unwrap(f5.call(store, {}));
   EXPECT_EQ(data.v, nullptr);
 }

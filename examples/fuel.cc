@@ -24,7 +24,7 @@ to tweak the `-lpthread` and such annotations.
 
 using namespace wasmtime;
 
-std::string readFile(const char* name) {
+std::string readFile(const char *name) {
   std::ifstream watFile;
   watFile.open(name);
   std::stringstream strStream;
@@ -47,7 +47,7 @@ int main() {
   Func fib = std::get<Func>(*instance.get(store, "fibonacci"));
 
   // Call it repeatedly until it fails
-  for (int32_t n = 1; ; n++) {
+  for (int32_t n = 1;; n++) {
     auto result = fib.call(store, {n});
     if (!result) {
       std::cout << "Exhausted fuel computing fib(" << n << ")\n";
@@ -56,7 +56,8 @@ int main() {
     uint64_t consumed = kStoreFuel - store.context().get_fuel().unwrap();
     auto fib_result = std::move(result).unwrap()[0].i32();
 
-    std::cout << "fib(" << n << ") = " << fib_result << " [consumed " << consumed << " fuel]\n";
+    std::cout << "fib(" << n << ") = " << fib_result << " [consumed "
+              << consumed << " fuel]\n";
     store.context().set_fuel(kStoreFuel).unwrap();
   }
 }

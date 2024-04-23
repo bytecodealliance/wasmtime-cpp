@@ -5,7 +5,7 @@
 
 using namespace wasmtime;
 
-std::string readFile(const char* name) {
+std::string readFile(const char *name) {
   std::ifstream watFile;
   watFile.open(name);
   std::stringstream strStream;
@@ -33,20 +33,22 @@ int main() {
   Table table = std::get<Table>(*instance.get(store, "table"));
   table.set(store, 3, externref).unwrap();
   ExternRef val = *table.get(store, 3)->externref();
-  std::cout << "externref data: " << std::any_cast<std::string>(val.data()) << "\n";
+  std::cout << "externref data: " << std::any_cast<std::string>(val.data())
+            << "\n";
 
   std::cout << "Touching `externref` global..\n";
   Global global = std::get<Global>(*instance.get(store, "global"));
   global.set(store, externref).unwrap();
   val = *global.get(store).externref();
-  std::cout << "externref data: " << std::any_cast<std::string>(val.data()) << "\n";
+  std::cout << "externref data: " << std::any_cast<std::string>(val.data())
+            << "\n";
 
   std::cout << "Calling `externref` func..\n";
   Func func = std::get<Func>(*instance.get(store, "func"));
   auto results = func.call(store, {externref}).unwrap();
   val = *results[0].externref();
-  std::cout << "externref data: " << std::any_cast<std::string>(val.data()) << "\n";
-
+  std::cout << "externref data: " << std::any_cast<std::string>(val.data())
+            << "\n";
 
   std::cout << "Running a gc..\n";
   store.context().gc();

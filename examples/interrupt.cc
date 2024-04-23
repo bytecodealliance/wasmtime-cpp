@@ -18,16 +18,16 @@ to tweak the `-lpthread` and such annotations as well as the name of the
 `libwasmtime.a` file on Windows.
 */
 
+#include <chrono>
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <thread>
-#include <chrono>
 #include <wasmtime.hh>
 
 using namespace wasmtime;
 
-std::string readFile(const char* name) {
+std::string readFile(const char *name) {
   std::ifstream watFile;
   watFile.open(name);
   std::stringstream strStream;
@@ -51,7 +51,7 @@ int main() {
   Func run = std::get<Func>(*instance.get(store, "run"));
 
   // Spin up a thread to send us an interrupt in a second
-  std::thread t([engine{std::move(engine)}](){
+  std::thread t([engine{std::move(engine)}]() {
     std::this_thread::sleep_for(std::chrono::seconds(1));
     std::cout << "Interrupting!\n";
     engine.increment_epoch();

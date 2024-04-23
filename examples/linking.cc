@@ -5,8 +5,7 @@
 
 using namespace wasmtime;
 
-template<typename T, typename E>
-T unwrap(Result<T, E> result) {
+template <typename T, typename E> T unwrap(Result<T, E> result) {
   if (result) {
     return result.ok();
   }
@@ -14,7 +13,7 @@ T unwrap(Result<T, E> result) {
   std::abort();
 }
 
-std::string readFile(const char* name) {
+std::string readFile(const char *name) {
   std::ifstream watFile;
   watFile.open(name);
   std::stringstream strStream;
