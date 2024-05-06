@@ -19,9 +19,7 @@ TEST(Store, Smoke) {
 
   store = Store(engine);
   store.limiter(-1, -1, -1, -1, -1);
-#if WASMTIME_HAS_EXTERNREF
   store.context().gc();
-#endif
   store.context().get_fuel().err();
   store.context().set_fuel(1).err();
   store.context().set_epoch_deadline(1);
@@ -147,15 +145,16 @@ TEST(WasiConfig, Smoke) {
   }
 }
 
-#if WASMTIME_HAS_EXTERNREF
 TEST(ExternRef, Smoke) {
-  ExternRef a("foo");
-  ExternRef b(3);
-  EXPECT_STREQ(std::any_cast<const char *>(a.data()), "foo");
-  EXPECT_EQ(std::any_cast<int>(b.data()), 3);
+  Engine engine;
+  Store store(engine);
+  ExternRef a(store, "foo");
+  ExternRef b(store, 3);
+  EXPECT_STREQ(std::any_cast<const char *>(a.data(store)), "foo");
+  EXPECT_EQ(std::any_cast<int>(b.data(store)), 3);
+  a.unroot(store);
   a = b;
 }
-#endif
 
 TEST(Val, Smoke) {
   Val val(1);
@@ -184,26 +183,24 @@ TEST(Val, Smoke) {
     EXPECT_EQ(val.v128().v128[i], 0);
   }
 
-#if WASMTIME_HAS_EXTERNREF
+  Engine engine;
+  Store store(engine);
   val = std::optional<ExternRef>(std::nullopt);
   EXPECT_EQ(val.kind(), ValKind::ExternRef);
-  EXPECT_EQ(val.externref(), std::nullopt);
+  EXPECT_EQ(val.externref(store), std::nullopt);
 
-  val = std::optional<ExternRef>(5);
+  val = std::optional<ExternRef>(ExternRef(store, 5));
   EXPECT_EQ(val.kind(), ValKind::ExternRef);
-  EXPECT_EQ(std::any_cast<int>(val.externref()->data()), 5);
+  EXPECT_EQ(std::any_cast<int>(val.externref(store)->data(store)), 5);
 
-  val = ExternRef(5);
+  val = ExternRef(store, 5);
   EXPECT_EQ(val.kind(), ValKind::ExternRef);
-  EXPECT_EQ(std::any_cast<int>(val.externref()->data()), 5);
-#endif
+  EXPECT_EQ(std::any_cast<int>(val.externref(store)->data(store)), 5);
 
   val = std::optional<Func>(std::nullopt);
   EXPECT_EQ(val.kind(), ValKind::FuncRef);
   EXPECT_EQ(val.funcref(), std::nullopt);
 
-  Engine engine;
-  Store store(engine);
   Func func(
       store, FuncType({}, {}),
       [](auto caller, auto params, auto results) -> auto{
