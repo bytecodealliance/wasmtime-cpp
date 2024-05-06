@@ -5,7 +5,7 @@
 
 using namespace wasmtime;
 
-std::string readFile(const char* name) {
+std::string readFile(const char *name) {
   std::ifstream watFile;
   watFile.open(name);
   std::stringstream strStream;

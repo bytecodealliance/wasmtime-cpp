@@ -50,10 +50,6 @@
 
 #include "wasmtime.h"
 
-#ifndef WASMTIME_HAS_EXTERNREF
-#define WASMTIME_HAS_EXTERNREF 0
-#endif
-
 namespace wasmtime {
 
 #ifdef __cpp_lib_span
@@ -492,15 +488,12 @@ enum class ValKind {
   F64,
   /// WebAssembly's `v128` type from the simd proposal
   V128,
-#if WASMTIME_HAS_EXTERNREF
   /// WebAssembly's `externref` type from the reference types
   ExternRef,
-#endif
   /// WebAssembly's `funcref` type from the reference types
   FuncRef,
 };
 
-#if WASMTIME_HAS_EXTERNREF
 /// Helper X macro to construct statement for each enumerator in `ValKind`.
 /// X(enumerator in `ValKind`, name string, enumerator in `wasm_valkind_t`)
 #define WASMTIME_FOR_EACH_VAL_KIND(X)                                          \
@@ -508,20 +501,9 @@ enum class ValKind {
   X(I64, "i64", WASM_I64)                                                      \
   X(F32, "f32", WASM_F32)                                                      \
   X(F64, "f64", WASM_F64)                                                      \
-  X(ExternRef, "externref", WASM_ANYREF)                                       \
+  X(ExternRef, "externref", WASM_EXTERNREF)                                    \
   X(FuncRef, "funcref", WASM_FUNCREF)                                          \
   X(V128, "v128", WASMTIME_V128)
-#else
-/// Helper X macro to construct statement for each enumerator in `ValKind`.
-/// X(enumerator in `ValKind`, name string, enumerator in `wasm_valkind_t`)
-#define WASMTIME_FOR_EACH_VAL_KIND(X)                                          \
-  X(I32, "i32", WASM_I32)                                                      \
-  X(I64, "i64", WASM_I64)                                                      \
-  X(F32, "f32", WASM_F32)                                                      \
-  X(F64, "f64", WASM_F64)                                                      \
-  X(FuncRef, "funcref", WASM_FUNCREF)                                          \
-  X(V128, "v128", WASMTIME_V128)
-#endif
 
 /// \brief Used to print a ValKind.
 inline std::ostream &operator<<(std::ostream &os, const ValKind &e) {
@@ -1648,6 +1630,8 @@ public:
     friend class Func;
     friend class Instance;
     friend class Linker;
+    friend class ExternRef;
+    friend class Val;
     wasmtime_context_t *ptr;
 
     Context(wasmtime_context_t *ptr) : ptr(ptr) {}
@@ -1662,11 +1646,9 @@ public:
     /// Creates a context referencing the provided `Caller`.
     Context(Caller *caller);
 
-#if WASMTIME_HAS_EXTERNREF
     /// Runs a garbage collection pass in the referenced store to collect loose
     /// `externref` values, if any are available.
     void gc() { wasmtime_context_gc(ptr); }
-#endif
 
     /// Injects fuel to be consumed within this store.
     ///
@@ -1737,21 +1719,25 @@ public:
   /// consumption of instances. Use negative value to keep the default value
   /// for the limit.
   ///
-  /// \param memory_size the maximum number of bytes a linear memory can grow to.
-  /// Growing a linear memory beyond this limit will fail. By default,
+  /// \param memory_size the maximum number of bytes a linear memory can grow
+  /// to. Growing a linear memory beyond this limit will fail. By default,
   /// linear memory will not be limited.
+  ///
   /// \param table_elements the maximum number of elements in a table.
   /// Growing a table beyond this limit will fail. By default, table elements
   /// will not be limited.
+  ///
   /// \param instances the maximum number of instances that can be created
   /// for a Store. Module instantiation will fail if this limit is exceeded.
   /// This value defaults to 10,000.
-  /// \param tables the maximum number of tables that can be created for a Store.
-  /// Module instantiation will fail if this limit is exceeded. This value
-  /// defaults to 10,000.
-  /// \param memories the maximum number of linear memories that can be created
-  /// for a Store. Instantiation will fail with an error if this limit is exceeded.
-  /// This value defaults to 10,000.
+  ///
+  /// \param tables the maximum number of tables that can be created for a
+  /// Store. Module instantiation will fail if this limit is exceeded. This
+  /// value defaults to 10,000.
+  ///
+  /// \param memories the maximum number of linear
+  /// memories that can be created for a Store. Instantiation will fail with an
+  /// error if this limit is exceeded. This value defaults to 10,000.
   ///
   /// Use any negative value for the parameters that should be kept on
   /// the default values.
@@ -1759,15 +1745,16 @@ public:
   /// Note that the limits are only used to limit the creation/growth of
   /// resources in the future, this does not retroactively attempt to apply
   /// limits to the store.
-  void limiter(int64_t memory_size, int64_t table_elements, int64_t instances, int64_t tables, int64_t memories) {
-    wasmtime_store_limiter(ptr.get(), memory_size, table_elements, instances, tables, memories);
+  void limiter(int64_t memory_size, int64_t table_elements, int64_t instances,
+               int64_t tables, int64_t memories) {
+    wasmtime_store_limiter(ptr.get(), memory_size, table_elements, instances,
+                           tables, memories);
   }
 
   /// Explicit function to acquire a `Context` from this store.
   Context context() { return this; }
 };
 
-#if WASMTIME_HAS_EXTERNREF
 /**
  * \brief Representation of a WebAssembly `externref` value.
  *
@@ -1776,62 +1763,61 @@ public:
  * embedding. It's suitable to place private data structures in here which
  * WebAssembly will not have access to, only other host functions will have
  * access to them.
+ *
+ * Note that `ExternRef` values are rooted within a `Store` and must be manually
+ * unrooted via the `unroot` function. If this is not used then values will
+ * never be candidates for garbage collection.
  */
 class ExternRef {
   friend class Val;
 
-  struct deleter {
-    void operator()(wasmtime_externref_t *p) const {
-      wasmtime_externref_delete(p);
-    }
-  };
-
-  std::unique_ptr<wasmtime_externref_t, deleter> ptr;
+  wasmtime_externref_t val;
 
   static void finalizer(void *ptr) {
     std::unique_ptr<std::any> _ptr(static_cast<std::any *>(ptr));
   }
 
 public:
-  /// Creates a new `ExternRef` from an owned C API raw pointer.
-  explicit ExternRef(wasmtime_externref_t *ptr) : ptr(ptr) {}
+  /// Creates a new `ExternRef` directly from its C-API representation.
+  explicit ExternRef(wasmtime_externref_t val) : val(val) {}
 
   /// Creates a new `externref` value from the provided argument.
   ///
   /// Note that `val` should be safe to send across threads and should own any
   /// memory that it points to. Also note that `ExternRef` is similar to a
   /// `std::shared_ptr` in that there can be many references to the same value.
-  template <typename T>
-  explicit ExternRef(T val)
-      : ExternRef(wasmtime_externref_new(
-            std::make_unique<std::any>(std::move(val)).release(), finalizer)) {}
-  /// Performs a shallow copy of another `externref` value, creating another
-  /// reference to it.
-  ExternRef(const ExternRef &other)
-      : ExternRef(wasmtime_externref_clone(other.ptr.get())) {}
-  /// Performs a shallow copy of another `externref` value, creating another
-  /// reference to it.
-  ExternRef &operator=(const ExternRef &other) {
-    ptr.reset(wasmtime_externref_clone(other.ptr.get()));
-    return *this;
+  template <typename T> explicit ExternRef(Store::Context cx, T val) {
+    void *ptr = std::make_unique<std::any>(std::move(val)).release();
+    bool ok = wasmtime_externref_new(cx.ptr, ptr, finalizer, &this->val);
+    if (!ok)  {
+      fprintf(stderr, "failed to allocate a new externref");
+      abort();
+    }
   }
-  /// Moves the resources pointed to by `other` into `this`.
-  ExternRef(ExternRef &&other) = default;
-  /// Moves the resources pointed to by `other` into `this`.
-  ExternRef &operator=(ExternRef &&other) = default;
-  ~ExternRef() = default;
+
+  /// Creates a new `ExternRef` which is separately rooted from this one.
+  ExternRef clone(Store::Context cx) {
+    wasmtime_externref_t other;
+    wasmtime_externref_clone(cx.ptr, &val, &other);
+    return ExternRef(other);
+  }
 
   /// Returns the underlying host data associated with this `ExternRef`.
-  std::any &data() {
-    return *static_cast<std::any *>(wasmtime_externref_data(ptr.get()));
+  std::any &data(Store::Context cx) {
+    return *static_cast<std::any *>(wasmtime_externref_data(cx.ptr, &val));
   }
 
-  /// Returns the raw underlying C API pointer.
+  /// Unroots this value from the context provided, enabling a future GC to
+  /// collect the internal object if there are no more references.
+  void unroot(Store::Context cx) {
+    wasmtime_externref_unroot(cx.ptr, &val);
+  }
+
+  /// Returns the raw underlying C API value.
   ///
   /// This class still retains ownership of the pointer.
-  wasmtime_externref_t *raw() const { return ptr.get(); }
+  const wasmtime_externref_t *raw() const { return &val; }
 };
-#endif
 
 class Func;
 class Global;
@@ -1863,6 +1849,9 @@ struct V128 {
  * This is roughly equivalent to a tagged union of all possible WebAssembly
  * values. This is later used as an argument with functions, globals, tables,
  * etc.
+ *
+ * Note that a `Val` can represent owned GC pointers. In this case the `unroot`
+ * method must be used to ensure that they can later be garbage-collected.
  */
 class Val {
   friend class Global;
@@ -1907,39 +1896,18 @@ public:
   Val(std::optional<Func> func);
   /// Creates a new `funcref` WebAssembly value which is not `ref.null func`.
   Val(Func func);
-#if WASMTIME_HAS_EXTERNREF
   /// Creates a new `externref` value.
   Val(std::optional<ExternRef> ptr) : val{} {
     val.kind = WASMTIME_EXTERNREF;
-    val.of.externref = nullptr;
     if (ptr) {
-      val.of.externref = ptr->ptr.release();
+      val.of.externref = ptr->val;
+    } else {
+      wasmtime_externref_set_null(&val.of.externref);
     }
   }
   /// Creates a new `externref` WebAssembly value which is not `ref.null
   /// extern`.
   Val(ExternRef ptr);
-#endif
-  /// Moves the resources from another value into this one.
-  Val(Val &&other) noexcept : val{} {
-    val.kind = WASMTIME_I32;
-    val.of.i32 = 0;
-    std::swap(val, other.val);
-  }
-
-#if WASMTIME_HAS_EXTERNREF
-  ~Val() {
-    if (val.kind == WASMTIME_EXTERNREF && val.of.externref != nullptr) {
-      wasmtime_externref_delete(val.of.externref);
-    }
-  }
-#endif
-
-  /// Moves the resources from another value into this one.
-  Val &operator=(Val &&other) noexcept {
-    std::swap(val, other.val);
-    return *this;
-  }
 
   /// Returns the kind of value that this value has.
   ValKind kind() const {
@@ -1954,10 +1922,8 @@ public:
       return ValKind::F64;
     case WASMTIME_FUNCREF:
       return ValKind::FuncRef;
-#if WASMTIME_HAS_EXTERNREF
     case WASMTIME_EXTERNREF:
       return ValKind::ExternRef;
-#endif
     case WASMTIME_V128:
       return ValKind::V128;
     }
@@ -2009,22 +1975,22 @@ public:
     return val.of.v128;
   }
 
-#if WASMTIME_HAS_EXTERNREF
   /// Returns the underlying `externref`, requires `kind() == KindExternRef` or
   /// aborts the process.
   ///
   /// Note that `externref` is a nullable reference, hence the `optional` return
   /// value.
-  std::optional<ExternRef> externref() const {
+  std::optional<ExternRef> externref(Store::Context cx) const {
     if (val.kind != WASMTIME_EXTERNREF) {
       std::abort();
     }
-    if (val.of.externref != nullptr) {
-      return ExternRef(wasmtime_externref_clone(val.of.externref));
+    if (val.of.externref.store_id == 0) {
+      return std::nullopt;
     }
-    return std::nullopt;
+    wasmtime_externref_t other;
+    wasmtime_externref_clone(cx.ptr, &val.of.externref, &other);
+    return ExternRef(other);
   }
-#endif
 
   /// Returns the underlying `funcref`, requires `kind() == KindFuncRef` or
   /// aborts the process.
@@ -2032,6 +1998,11 @@ public:
   /// Note that `funcref` is a nullable reference, hence the `optional` return
   /// value.
   std::optional<Func> funcref() const;
+
+  /// Unroots any GC references this `Val` points to within the `cx` provided.
+  void unroot(Store::Context cx) {
+    wasmtime_val_unroot(cx.ptr, &val);
+  }
 };
 
 /**
@@ -2093,7 +2064,6 @@ NATIVE_WASM_TYPE(double, F64, f64)
 
 #undef NATIVE_WASM_TYPE
 
-#if WASMTIME_HAS_EXTERNREF
 /// Type information for `externref`, represented on the host as an optional
 /// `ExternRef`.
 template <> struct WasmType<std::optional<ExternRef>> {
@@ -2112,11 +2082,11 @@ template <> struct WasmType<std::optional<ExternRef>> {
     if (p->externref == 0) {
       return std::nullopt;
     }
-    return ExternRef(
-        wasmtime_externref_from_raw(cx.raw_context(), p->externref));
+    wasmtime_externref_t val;
+    wasmtime_externref_from_raw(cx.raw_context(), p->externref, &val);
+    return ExternRef(val);
   }
 };
-#endif
 
 /// Type information for the `V128` host value used as a wasm value.
 template <> struct WasmType<V128> {
@@ -2474,9 +2444,8 @@ public:
    * > signature is statically known it's recommended to use `Func::typed` and
    * > `TypedFunc::call`.
    */
-  template<typename I>
-  TrapResult<std::vector<Val>> call(Store::Context cx,
-                                    const I &begin,
+  template <typename I>
+  TrapResult<std::vector<Val>> call(Store::Context cx, const I &begin,
                                     const I &end) const {
     std::vector<wasmtime_val_t> raw_params;
     raw_params.reserve(end - begin);
@@ -2510,8 +2479,8 @@ public:
     return this->call(cx, params.begin(), params.end());
   }
 
-  TrapResult<std::vector<Val>> call(Store::Context cx,
-                                    const std::initializer_list<Val> &params) const {
+  TrapResult<std::vector<Val>>
+  call(Store::Context cx, const std::initializer_list<Val> &params) const {
     return this->call(cx, params.begin(), params.end());
   }
 
@@ -2597,17 +2566,15 @@ public:
 
 inline Val::Val(std::optional<Func> func) : val{} {
   val.kind = WASMTIME_FUNCREF;
-  val.of.funcref.store_id = 0;
-  val.of.funcref.index = 0;
   if (func) {
     val.of.funcref = (*func).func;
+  } else {
+    wasmtime_funcref_set_null(&val.of.funcref);
   }
 }
 
 inline Val::Val(Func func) : Val(std::optional(func)) {}
-#if WASMTIME_HAS_EXTERNREF
 inline Val::Val(ExternRef ptr) : Val(std::optional(ptr)) {}
-#endif
 
 inline std::optional<Func> Val::funcref() const {
   if (val.kind != WASMTIME_FUNCREF) {

@@ -7,7 +7,7 @@
 
 using namespace wasmtime;
 
-std::string readFile(const char* name) {
+std::string readFile(const char *name) {
   std::ifstream watFile;
   watFile.open(name);
   std::stringstream strStream;
@@ -19,7 +19,8 @@ int main() {
   // Create our `store` context and then compile a module and create an
   // instance from the compiled module all in one go.
   Engine engine;
-  Module module = Module::compile(engine, readFile("examples/memory.wat")).unwrap();
+  Module module =
+      Module::compile(engine, readFile("examples/memory.wat")).unwrap();
   Store store(engine);
   Instance instance = Instance::create(store, module, {}).unwrap();
 
