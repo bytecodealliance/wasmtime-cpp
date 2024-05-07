@@ -615,6 +615,7 @@ public:
   /// Copies the contents of another type into this one.
   ValType &operator=(const ValType &other) {
     ptr.reset(wasm_valtype_copy(other.ptr.get()));
+    ref = other.ref;
     return *this;
   }
   ~ValType() = default;
