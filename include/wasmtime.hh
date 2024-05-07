@@ -2548,17 +2548,20 @@ public:
     std::array<wasmtime_val_raw_t, std::max(WasmTypeList<Params>::size,
                                             WasmTypeList<Results>::size)>
         storage;
-    WasmTypeList<Params>::store(cx, storage.data(), params);
+    wasmtime_val_raw_t *ptr = storage.data();
+    if (ptr == nullptr)
+      ptr = reinterpret_cast<wasmtime_val_raw_t*>(alignof(wasmtime_val_raw_t));
+    WasmTypeList<Params>::store(cx, ptr, params);
     wasm_trap_t *trap = nullptr;
     auto *error = wasmtime_func_call_unchecked(
-        cx.raw_context(), &f.func, storage.data(), storage.size(), &trap);
+        cx.raw_context(), &f.func, ptr, storage.size(), &trap);
     if (error != nullptr) {
       return TrapError(Error(error));
     }
     if (trap != nullptr) {
       return TrapError(Trap(trap));
     }
-    return WasmTypeList<Results>::load(cx, storage.data());
+    return WasmTypeList<Results>::load(cx, ptr);
   }
 
   /// Returns the underlying un-typed `Func` for this function.
