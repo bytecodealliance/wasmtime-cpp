@@ -22,7 +22,7 @@ jobs:
     - run: echo "`pwd`/doxygen-1.9.5/bin" >> $GITHUB_PATH
     - run: doxygen doxygen.conf
     - run: tar czf html.tar.gz html
-    - uses: actions/upload-artifact@v2
+    - uses: actions/upload-artifact@v4
       with:
         name: c-api
         path: html.tar.gz
