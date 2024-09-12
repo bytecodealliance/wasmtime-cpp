@@ -2720,14 +2720,14 @@ public:
   }
 
   /// Returns the size, in elements, that the table currently has.
-  size_t size(Store::Context cx) const {
+  uint64_t size(Store::Context cx) const {
     return wasmtime_table_size(cx.ptr, &table);
   }
 
   /// Loads a value from the specified index in this table.
   ///
   /// Returns `std::nullopt` if `idx` is out of bounds.
-  std::optional<Val> get(Store::Context cx, uint32_t idx) const {
+  std::optional<Val> get(Store::Context cx, uint64_t idx) const {
     Val val;
     if (wasmtime_table_get(cx.ptr, &table, idx, &val.val)) {
       return val;
@@ -2738,7 +2738,7 @@ public:
   /// Stores a value into the specified index in this table.
   ///
   /// Returns an error if `idx` is out of bounds or if `val` has the wrong type.
-  Result<std::monostate> set(Store::Context cx, uint32_t idx,
+  Result<std::monostate> set(Store::Context cx, uint64_t idx,
                              const Val &val) const {
     auto *error = wasmtime_table_set(cx.ptr, &table, idx, &val.val);
     if (error != nullptr) {
@@ -2755,9 +2755,9 @@ public:
   ///
   /// Returns an error if `init` has the wrong type for this table. Otherwise
   /// returns the previous size of the table before growth.
-  Result<uint32_t> grow(Store::Context cx, uint32_t delta,
+  Result<uint64_t> grow(Store::Context cx, uint64_t delta,
                         const Val &init) const {
-    uint32_t prev = 0;
+    uint64_t prev = 0;
     auto *error = wasmtime_table_grow(cx.ptr, &table, delta, &init.val, &prev);
     if (error != nullptr) {
       return Error(error);
