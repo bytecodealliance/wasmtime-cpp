@@ -1577,8 +1577,10 @@ public:
 
   /// Opens `path` to be opened as `guest_path` in the WASI pseudo-filesystem.
   [[nodiscard]] bool preopen_dir(const std::string &path,
-                                 const std::string &guest_path) {
-    return wasi_config_preopen_dir(ptr.get(), path.c_str(), guest_path.c_str());
+                                 const std::string &guest_path,
+                                 size_t dir_perms,
+                                 size_t file_perms) {
+    return wasi_config_preopen_dir(ptr.get(), path.c_str(), guest_path.c_str(), dir_perms, file_perms);
   }
 };
 
