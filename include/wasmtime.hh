@@ -383,18 +383,11 @@ public:
     wasmtime_config_static_memory_maximum_size_set(ptr.get(), size);
   }
 
-  /// \brief Configures the size of static memory's guard region
+  /// \brief Configures the size of memory's guard region
   ///
-  /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.static_memory_guard_size
-  void static_memory_guard_size(size_t size) {
-    wasmtime_config_static_memory_guard_size_set(ptr.get(), size);
-  }
-
-  /// \brief Configures the size of dynamic memory's guard region
-  ///
-  /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.dynamic_memory_guard_size
-  void dynamic_memory_guard_size(size_t size) {
-    wasmtime_config_dynamic_memory_guard_size_set(ptr.get(), size);
+  /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.memory_guard_size
+  void memory_guard_size(size_t size) {
+    wasmtime_config_memory_guard_size_set(ptr.get(), size);
   }
 
   /// \brief Loads the default cache configuration present on the system.
@@ -674,6 +667,9 @@ public:
 
     /// Returns whether or not this is a 64-bit memory type.
     bool is_64() const { return wasmtime_memorytype_is64(ptr); }
+
+    /// Returns whether or not this is a shared memory type.
+    bool is_shared() const { return wasmtime_memorytype_isshared(ptr); }
   };
 
 private:
@@ -685,20 +681,20 @@ public:
   /// pages for the minimum size. The created type will have no maximum memory
   /// size.
   explicit MemoryType(uint32_t min)
-      : MemoryType(wasmtime_memorytype_new(min, false, 0, false)) {}
+      : MemoryType(wasmtime_memorytype_new(min, false, 0, false, false)) {}
   /// Creates a new 32-bit wasm memory type with the specified minimum number of
   /// pages for the minimum size, and maximum number of pages for the max size.
   MemoryType(uint32_t min, uint32_t max)
-      : MemoryType(wasmtime_memorytype_new(min, true, max, false)) {}
+      : MemoryType(wasmtime_memorytype_new(min, true, max, false, false)) {}
 
   /// Same as the `MemoryType` constructor, except creates a 64-bit memory.
   static MemoryType New64(uint64_t min) {
-    return MemoryType(wasmtime_memorytype_new(min, false, 0, true));
+    return MemoryType(wasmtime_memorytype_new(min, false, 0, true, false));
   }
 
   /// Same as the `MemoryType` constructor, except creates a 64-bit memory.
   static MemoryType New64(uint64_t min, uint64_t max) {
-    return MemoryType(wasmtime_memorytype_new(min, true, max, true));
+    return MemoryType(wasmtime_memorytype_new(min, true, max, true, false));
   }
 
   /// Creates a new wasm memory type from the specified ref, making a fresh
