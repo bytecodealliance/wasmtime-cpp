@@ -376,11 +376,11 @@ public:
         ptr.get(), static_cast<wasmtime_profiling_strategy_t>(profiler));
   }
 
-  /// \brief Configures the maximum size of memory to use a "static memory"
+  /// \brief Configures the size of the initial linear memory allocation.
   ///
-  /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.static_memory_maximum_size
-  void static_memory_maximum_size(size_t size) {
-    wasmtime_config_static_memory_maximum_size_set(ptr.get(), size);
+  /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.memory_reservation
+  void memory_reservation(size_t size) {
+    wasmtime_config_memory_reservation_set(ptr.get(), size);
   }
 
   /// \brief Configures the size of memory's guard region
