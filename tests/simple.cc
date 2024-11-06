@@ -46,7 +46,7 @@ TEST(Config, Smoke) {
   config.cranelift_debug_verifier(false);
   config.cranelift_opt_level(OptLevel::Speed);
   config.profiler(ProfilingStrategy::None);
-  config.static_memory_maximum_size(0);
+  config.memory_reservation(0);
   config.memory_guard_size(0);
   auto result = config.cache_load_default();
   config.cache_load("nonexistent").err();
