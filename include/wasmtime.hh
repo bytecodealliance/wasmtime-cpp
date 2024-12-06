@@ -40,6 +40,7 @@
 #include <limits>
 #include <memory>
 #include <optional>
+#include <ostream>
 #include <variant>
 #include <vector>
 #ifdef __has_include
