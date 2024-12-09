@@ -43,6 +43,9 @@
 #include <ostream>
 #include <variant>
 #include <vector>
+#include <algorithm>
+#include <unordered_map>
+#include <filesystem>
 #ifdef __has_include
 #if __has_include(<span>)
 #include <span>
@@ -50,6 +53,8 @@
 #endif
 
 #include "wasmtime.h"
+
+using fs = std::filesystem;
 
 namespace wasmtime {
 
@@ -3135,6 +3140,137 @@ public:
     }
     return Func(item);
   }
+};
+
+class WasiApp {
+ public:
+  explicit WasiApp(std::vector<fs::path> linkdirs,
+                   std::optional<fs::path> workdir = std::nullopt)
+      : link_dirs_{std::move(linkdirs)}
+      , workdir_{std::move(workdir)} {
+    linker_.define_wasi().unwrap();
+  }
+
+  void set_config(WasiConfig&& config) {
+    store_.context().set_wasi(std::move(config)).unwrap();
+  }
+
+  void load_app(const std::string& app_name) {
+    reset_app();
+    auto workdir = workdir_.value_or(fs::current_path());
+    std::optional<fs::path> filename = find_file(workdir, app_name);
+    Module module = compile(filename.value());
+    app_instance_ = link(app_name, module);
+  }
+
+  void run(const std::string& entry_point, const std::vector<Val> &params) {
+    Func f = std::get<Func>(*app_instance_.value().get(store_, entry_point));
+    f.call(store_, {}).unwrap();
+  }
+
+ private:
+  [[nodiscard]]
+  static std::string read_wat_file(const char* name) {
+    std::ifstream watFile;
+    watFile.open(name);
+    std::stringstream strStream;
+    strStream << watFile.rdbuf();
+    return strStream.str();
+  }
+
+  [[nodiscard]]
+  static std::vector<uint8_t> read_wasm_file(const char* name) {
+    std::ifstream bin_file(name, std::ios::binary);
+    return {(std::istreambuf_iterator<char>(bin_file)), (std::istreambuf_iterator<char>())};
+  }
+
+  [[nodiscard]]
+  static std::optional<fs::path> find_file(const fs::path& search_dir,
+                                           const std::string& app_name) {
+    std::optional<fs::path> filename;
+    for (auto &p : fs::directory_iterator(search_dir)) {
+      if (is_regular_file(p.path())) {
+        if (p.path().stem() == app_name &&
+            (p.path().extension() == ".wasm" ||
+             p.path().extension() == ".wat")) {
+          filename = p.path();
+          break;
+        }
+      }
+    }
+    return filename;
+  }
+  
+  [[nodiscard]]
+  Instance link(const std::string& name, const Module& module) {
+    std::unordered_map<std::string, std::vector<std::string>> imports;
+    for (auto i : module.imports()) {
+      imports[std::string(i.module())].push_back(std::string(i.name()));
+    }
+    for (auto& [import_file, import_symbols] : imports) {
+      std::sort(import_symbols.begin(), import_symbols.end());
+    }
+    load_imports(imports);
+    Instance linking_instance = linker_.instantiate(store_, module).unwrap();
+    linker_.define_instance(store_, name, linking_instance);
+    imported_modules_.push_back(module);
+    return linking_instance;
+  }
+
+  [[nodiscard]]
+  Module compile(const fs::path& path) {
+    if (path.extension() == ".wat") {
+      auto linking_wat = read_wat_file(path.string().c_str());
+      return Module::compile(engine_, linking_wat).unwrap();
+    } else {
+      auto linking_wasm = read_wasm_file(path.string().c_str());
+      return Module::compile(engine_, linking_wasm).unwrap();
+    }
+  }
+
+  void load_imports(const std::unordered_map<std::string, std::vector<std::string>>& imports) {
+    for (const auto& [import_file, import_symbols] : imports) {
+      if (import_file.find("wasi_snapshot") != std::string::npos) {
+        continue;
+      }
+      bool is_found_wasm = false;
+      for (const auto& link_dirs : link_dirs_) {
+        std::optional<fs::path> link_filename = find_file(link_dirs, import_file);
+        if (link_filename) {
+          Module linking_module = compile(link_filename.value());
+          std::vector<std::string> exports;
+          for (const auto& e : linking_module.exports()) {
+            exports.emplace_back(e.name());
+          }
+          std::sort(exports.begin(), exports.end());
+          if (exports != import_symbols) {
+            continue;
+          }
+          Instance linking_instance = link(import_file, linking_module);
+          is_found_wasm = true;
+          break;
+        }
+      }
+      if (!is_found_wasm) {
+        fprintf(stderr, "error: Cannot link module %s\n", import_file.c_str());
+        std::abort();
+      }
+    }
+  }
+
+  void reset_app() {
+    app_instance_.reset();
+    imported_modules_.clear();
+  }
+
+  Engine engine_;
+  Store store_{engine_};
+  Linker linker_{engine_};
+
+  std::vector<fs::path> link_dirs_;
+  std::optional<fs::path> workdir_;
+  std::optional<Instance> app_instance_;
+  std::vector<Module> imported_modules_;
 };
 
 } // namespace wasmtime
