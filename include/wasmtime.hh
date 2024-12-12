@@ -2208,7 +2208,7 @@ template <typename R> struct WasmHostRet<Result<R, Trap>> {
 
 template <typename F, typename = void> struct WasmHostFunc;
 
-/// Base type information for host function pointers being used as wasm
+/// Base type information for host free-function pointers being used as wasm
 /// functions
 template <typename R, typename... A> struct WasmHostFunc<R (*)(A...)> {
   using Params = WasmTypeList<std::tuple<A...>>;
@@ -2240,27 +2240,28 @@ struct WasmHostFunc<R (*)(Caller, A...)> : public WasmHostFunc<R (*)(A...)> {
   }
 };
 
-/// Function type information, but with as a host method.
+/// Function type information, but with a class method.
 template <typename R, typename C, typename... A>
 struct WasmHostFunc<R (C::*)(A...)> : public WasmHostFunc<R (*)(A...)> {};
 
-/// Function type information, but with as a const host method.
+/// Function type information, but with a const class method.
 template <typename R, typename C, typename... A>
 struct WasmHostFunc<R (C::*)(A...) const> : public WasmHostFunc<R (*)(A...)> {};
 
-/// Function type information, but with as a host method with a `Caller` first
+/// Function type information, but as a host method with a `Caller` first
 /// parameter.
 template <typename R, typename C, typename... A>
 struct WasmHostFunc<R (C::*)(Caller, A...)>
     : public WasmHostFunc<R (*)(Caller, A...)> {};
 
-/// Function type information, but with as a host const method with a `Caller`
+/// Function type information, but as a host const method with a `Caller`
 /// first parameter.
 template <typename R, typename C, typename... A>
 struct WasmHostFunc<R (C::*)(Caller, A...) const>
     : public WasmHostFunc<R (*)(Caller, A...)> {};
 
-// Forward... something? Not entirely sure but this makes things work.
+/// Base type information for host callables being used as wasm
+/// functions
 template <typename T>
 struct WasmHostFunc<T, std::void_t<decltype(&T::operator())>>
     : public WasmHostFunc<decltype(&T::operator())> {};
@@ -3087,12 +3088,12 @@ public:
                 bool> = true>
   Result<std::monostate> func_new(std::string_view module,
                                   std::string_view name, const FuncType &ty,
-                                  F f) {
+                                  F&& f) {
 
     auto *error = wasmtime_linker_define_func(
         ptr.get(), module.data(), module.length(), name.data(), name.length(),
-        ty.ptr.get(), Func::raw_callback<F>, std::make_unique<F>(f).release(),
-        Func::raw_finalize<F>);
+        ty.ptr.get(), Func::raw_callback<std::remove_reference_t<F>>, std::make_unique<std::remove_reference_t<F>>(std::forward<F>(f)).release(),
+        Func::raw_finalize<std::remove_reference_t<F>>);
 
     if (error != nullptr) {
       return Error(error);
@@ -3107,15 +3108,15 @@ public:
             std::enable_if_t<WasmHostFunc<F>::Params::valid, bool> = true,
             std::enable_if_t<WasmHostFunc<F>::Results::valid, bool> = true>
   Result<std::monostate> func_wrap(std::string_view module,
-                                   std::string_view name, F f) {
+                                   std::string_view name, F&& f) {
     using HostFunc = WasmHostFunc<F>;
     auto params = HostFunc::Params::types();
     auto results = HostFunc::Results::types();
     auto ty = FuncType::from_iters(params, results);
     auto *error = wasmtime_linker_define_func_unchecked(
         ptr.get(), module.data(), module.length(), name.data(), name.length(),
-        ty.ptr.get(), Func::raw_callback_unchecked<F>,
-        std::make_unique<F>(f).release(), Func::raw_finalize<F>);
+        ty.ptr.get(), Func::raw_callback_unchecked<std::remove_reference_t<F>>,
+        std::make_unique<std::remove_reference_t<F>>(std::forward<F>(f)).release(), Func::raw_finalize<std::remove_reference_t<F>>);
 
     if (error != nullptr) {
       return Error(error);
