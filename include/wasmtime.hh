@@ -346,6 +346,27 @@ public:
     wasmtime_config_wasm_multi_value_set(ptr.get(), enable);
   }
 
+  /// \brief Configures whether the WebAssembly Garbage Collection proposal will be enabled
+  ///
+  /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.wasm_gc
+  void wasm_gc(bool enable) {
+    wasmtime_config_wasm_gc_set(ptr.get(), enable);
+  }
+
+  /// \brief Configures whether the WebAssembly function references proposal will be enabled
+  ///
+  /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.wasm_function_references
+  void wasm_function_references(bool enable) {
+    wasmtime_config_wasm_function_references_set(ptr.get(), enable);
+  }
+
+  /// \brief Configure whether wasmtime should compile a module using multiple threads.
+  ///
+  /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.parallel_compilation
+  void parallel_compilation(bool enable) {
+    wasmtime_config_parallel_compilation_set(ptr.get(), enable);
+  }
+
   /// \brief Configures compilation strategy for wasm code.
   ///
   /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.strategy
