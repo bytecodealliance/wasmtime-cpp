@@ -329,6 +329,46 @@ TEST(Linker, Smoke) {
   EXPECT_TRUE(std::holds_alternative<Func>(*linker.get(store, "a", "f")));
 }
 
+TEST(Linker, CallableMove) {
+  Engine engine;
+  Linker linker(engine);
+  Store store(engine);
+  linker.allow_shadowing(false);
+
+  struct CallableFunc {
+    CallableFunc() = default;
+    CallableFunc(const CallableFunc&) = delete;
+    CallableFunc(CallableFunc&&) = default;
+
+    Result<std::monostate, Trap> operator()(Caller caller, Span<const Val> params, Span<Val> results) {
+      return std::monostate();
+    }
+  };
+
+  CallableFunc cf;
+  unwrap(linker.func_new("a", "f", FuncType({}, {}), std::move(cf)));
+}
+
+TEST(Linker, CallableCopy) {
+  Engine engine;
+  Linker linker(engine);
+  Store store(engine);
+  linker.allow_shadowing(false);
+
+  struct CallableFunc {
+    CallableFunc() = default;
+    CallableFunc(const CallableFunc&) = default;
+    CallableFunc(CallableFunc&&) = default;
+
+    Result<std::monostate, Trap> operator()(Caller caller, Span<const Val> params, Span<Val> results) {
+      return std::monostate();
+    }
+  };
+
+  CallableFunc cf;
+  unwrap(linker.func_new("a", "f", FuncType({}, {}), cf));
+}
+
 TEST(Caller, Smoke) {
   Engine engine;
   Store store(engine);
