@@ -258,6 +258,199 @@ enum class ProfilingStrategy {
 };
 
 /**
+ * \brief Pool allocation configuration for Wasmtime.
+ *
+ * For more information be sure to consult the [rust
+ * documentation](https://docs.wasmtime.dev/api/wasmtime/struct.PoolingAllocationConfig.html).
+ */
+class PoolAllocationConfig {
+  friend class Config;
+
+  struct deleter {
+    void operator()(wasmtime_pooling_allocation_config_t *p) const {
+      wasmtime_pooling_allocation_config_delete(p);
+    }
+  };
+
+  std::unique_ptr<wasmtime_pooling_allocation_config_t, deleter> ptr;
+
+public:
+  PoolAllocationConfig() : ptr(wasmtime_pooling_allocation_config_new()) {}
+
+  /// \brief Configures the maximum number of “unused warm slots” to retain in
+  /// the pooling allocator.
+  ///
+  /// https://docs.wasmtime.dev/api/wasmtime/struct.PoolingAllocationConfig.html#method.max_unused_warm_slots.
+  void max_unused_warm_slots(uint32_t max) {
+    wasmtime_pooling_allocation_config_max_unused_warm_slots_set(ptr.get(),
+                                                                 max);
+  }
+
+  /// \brief The target number of decommits to do per batch.
+  ///
+  /// https://docs.wasmtime.dev/api/wasmtime/struct.PoolingAllocationConfig.html#method.decommit_batch_size.
+  void decommit_batch_size(size_t batch_size) {
+    wasmtime_pooling_allocation_config_decommit_batch_size_set(ptr.get(),
+                                                               batch_size);
+  }
+
+  /// \brief How much memory, in bytes, to keep resident for async stacks
+  /// allocated with the pooling allocator.
+  ///
+  /// https://docs.wasmtime.dev/api/wasmtime/struct.PoolingAllocationConfig.html#method.async_stack_keep_resident.
+  void async_stack_keep_resident(size_t size) {
+    wasmtime_pooling_allocation_config_async_stack_keep_resident_set(ptr.get(),
+                                                                     size);
+  }
+
+  /// \brief How much memory, in bytes, to keep resident for each linear memory
+  /// after deallocation.
+  ///
+  /// https://docs.wasmtime.dev/api/wasmtime/struct.PoolingAllocationConfig.html#method.linear_memory_keep_resident.
+  void linear_memory_keep_resident(size_t size) {
+    wasmtime_pooling_allocation_config_linear_memory_keep_resident_set(
+        ptr.get(), size);
+  }
+
+  /// \brief How much memory, in bytes, to keep resident for each table after
+  /// deallocation.
+  ///
+  /// https://docs.wasmtime.dev/api/wasmtime/struct.PoolingAllocationConfig.html#method.table_keep_resident.
+  void table_keep_resident(size_t size) {
+    wasmtime_pooling_allocation_config_table_keep_resident_set(ptr.get(), size);
+  }
+
+  /// \brief The maximum number of concurrent component instances supported
+  /// (default is 1000).
+  ///
+  /// https://docs.wasmtime.dev/api/wasmtime/struct.PoolingAllocationConfig.html#method.total_component_instances.
+  void total_component_instances(uint32_t count) {
+    wasmtime_pooling_allocation_config_total_component_instances_set(ptr.get(),
+                                                                     count);
+  }
+
+  /// \brief The maximum size, in bytes, allocated for a component instance’s
+  /// VMComponentContext metadata.
+  ///
+  /// https://docs.wasmtime.dev/api/wasmtime/struct.PoolingAllocationConfig.html#method.max_component_instance_size.
+  void max_component_instance_size(size_t size) {
+    wasmtime_pooling_allocation_config_max_component_instance_size_set(
+        ptr.get(), size);
+  }
+
+  /// \brief The maximum number of core instances a single component may contain
+  /// (default is unlimited).
+  ///
+  /// https://docs.wasmtime.dev/api/wasmtime/struct.PoolingAllocationConfig.html#method.max_core_instances_per_component.
+  void max_core_instances_per_component(uint32_t count) {
+    wasmtime_pooling_allocation_config_max_core_instances_per_component_set(
+        ptr.get(), count);
+  }
+
+  /// \brief The maximum number of Wasm linear memories that a single component
+  /// may transitively contain (default is unlimited).
+  ///
+  /// https://docs.wasmtime.dev/api/wasmtime/struct.PoolingAllocationConfig.html#method.max_memories_per_component.
+  void max_memories_per_component(uint32_t count) {
+    wasmtime_pooling_allocation_config_max_memories_per_component_set(ptr.get(),
+                                                                      count);
+  }
+
+  /// \brief The maximum number of tables that a single component may
+  /// transitively contain (default is unlimited).
+  ///
+  /// https://docs.wasmtime.dev/api/wasmtime/struct.PoolingAllocationConfig.html#method.max_tables_per_component.
+  void max_tables_per_component(uint32_t count) {
+    wasmtime_pooling_allocation_config_max_tables_per_component_set(ptr.get(),
+                                                                    count);
+  }
+
+  /// \brief The maximum number of concurrent Wasm linear memories supported
+  /// (default is 1000).
+  ///
+  /// https://docs.wasmtime.dev/api/wasmtime/struct.PoolingAllocationConfig.html#method.total_memories.
+  void total_memories(uint32_t count) {
+    wasmtime_pooling_allocation_config_total_memories_set(ptr.get(), count);
+  }
+
+  /// \brief The maximum number of concurrent tables supported (default is
+  /// 1000).
+  ///
+  /// https://docs.wasmtime.dev/api/wasmtime/struct.PoolingAllocationConfig.html#method.total_tables.
+  void total_tables(uint32_t count) {
+    wasmtime_pooling_allocation_config_total_tables_set(ptr.get(), count);
+  }
+
+  /// \brief The maximum number of execution stacks allowed for asynchronous
+  /// execution, when enabled (default is 1000).
+  ///
+  /// https://docs.wasmtime.dev/api/wasmtime/struct.PoolingAllocationConfig.html#method.total_stacks.
+  void total_stacks(uint32_t count) {
+    wasmtime_pooling_allocation_config_total_stacks_set(ptr.get(), count);
+  }
+
+  /// \brief The maximum number of concurrent core instances supported (default
+  /// is 1000).
+  ///
+  /// https://docs.wasmtime.dev/api/wasmtime/struct.PoolingAllocationConfig.html#method.total_core_instances.
+  void total_core_instances(uint32_t count) {
+    wasmtime_pooling_allocation_config_total_core_instances_set(ptr.get(),
+                                                                count);
+  }
+
+  /// \brief The maximum size, in bytes, allocated for a core instance’s
+  /// VMContext metadata.
+  ///
+  /// https://docs.wasmtime.dev/api/wasmtime/struct.PoolingAllocationConfig.html#method.max_core_instance_size.
+  void max_core_instance_size(size_t size) {
+    wasmtime_pooling_allocation_config_max_core_instance_size_set(ptr.get(),
+                                                                  size);
+  }
+
+  /// \brief The maximum number of defined tables for a core module (default is
+  /// 1).
+  ///
+  /// https://docs.wasmtime.dev/api/wasmtime/struct.PoolingAllocationConfig.html#method.max_tables_per_module.
+  void max_tables_per_module(uint32_t tables) {
+    wasmtime_pooling_allocation_config_max_tables_per_module_set(ptr.get(),
+                                                                 tables);
+  }
+
+  /// \brief The maximum table elements for any table defined in a module
+  /// (default is 20000).
+  ///
+  /// https://docs.wasmtime.dev/api/wasmtime/struct.PoolingAllocationConfig.html#method.table_elements.
+  void table_elements(size_t elements) {
+    wasmtime_pooling_allocation_config_table_elements_set(ptr.get(), elements);
+  }
+
+  /// \brief The maximum number of defined linear memories for a module (default
+  /// is 1).
+  ///
+  /// https://docs.wasmtime.dev/api/wasmtime/struct.PoolingAllocationConfig.html#method.max_memories_per_module.
+  void max_memories_per_module(uint32_t memories) {
+    wasmtime_pooling_allocation_config_max_memories_per_module_set(ptr.get(),
+                                                                   memories);
+  }
+
+  /// \brief The maximum byte size that any WebAssembly linear memory may grow
+  /// to.
+  ///
+  /// https://docs.wasmtime.dev/api/wasmtime/struct.PoolingAllocationConfig.html#method.max_memory_size.
+  void max_memory_size(size_t bytes) {
+    wasmtime_pooling_allocation_config_max_memory_size_set(ptr.get(), bytes);
+  }
+
+  /// \brief The maximum number of concurrent GC heaps supported (default is
+  /// 1000).
+  ///
+  /// https://docs.wasmtime.dev/api/wasmtime/struct.PoolingAllocationConfig.html#method.total_gc_heaps.
+  void total_gc_heaps(uint32_t count) {
+    wasmtime_pooling_allocation_config_total_gc_heaps_set(ptr.get(), count);
+  }
+};
+
+/**
  * \brief Configuration for Wasmtime.
  *
  * This class is used to configure Wasmtime's compilation and various other
@@ -432,6 +625,13 @@ public:
       return Error(error);
     }
     return std::monostate();
+  }
+
+  /// \brief Enables and configures the pooling allocation strategy.
+  ///
+  /// https://docs.wasmtime.dev/api/wasmtime/struct.Config.html#method.allocation_strategy
+  void pooling_allocation_strategy(const PoolAllocationConfig &config) {
+    wasmtime_pooling_allocation_strategy_set(ptr.get(), config.ptr.get());
   }
 };
 
